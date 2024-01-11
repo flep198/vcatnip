@@ -1,0 +1,121 @@
+<FileChoosePopup>:
+    title: "Choose a .CSV File"
+    size_hint: .9, .9
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "vertical"
+        FileChooser:
+            id: filechooser
+            multiselect: True
+            FileChooserIconLayout
+
+
+        BoxLayout:
+            size_hint: (1, 0.1)
+            pos_hint: {'center_x': .5, 'center_y': .5}
+            spacing: 20
+            Button:
+                text: "Cancel"
+                on_release: root.dismiss()
+            Button:
+                text: "Load"
+                on_release: root.load(filechooser.selection)
+                id: ldbtn
+                disabled: True if filechooser.selection==[] else False
+
+<ModelFits>:
+    do_default_tab: False
+
+    TabbedPanelItem:
+        text: 'Import'
+        background_color: (1, .5, 0, 1)
+        background_normal: ''
+        StackLayout:
+            orientation: 'lr-tb'
+            size_hint_y: None
+            height: 30
+            spacing: 5
+            Label:
+                text: 'Modelfit Images (.fits files)'
+                size_hint_x: 1
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Button:
+                text: 'Choose File'
+                size_hint_x: 0.2
+                on_press: root.open_popup()
+            TextInput:
+                id: get_file
+                readonly: True
+                size_hint_x: 0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
+    TabbedPanelItem:
+        text: 'View'
+        background_color: (1, .5, 0, 1)
+        background_normal: ''
+        BoxLayout:
+            orientation: 'vertical'
+            BoxLayout:
+                orientation: 'horizontal'
+                padding: 50
+                BoxLayout:
+                    id: box_top_left
+                    orientation: 'vertical'
+                    ScrollView:
+                        size: self.size
+                        size_hint_y: 0.9
+                        id: scroll_component
+                        GridLayout:
+                            size_hint_y: None
+                            cols: 1
+                            id: component_list
+                            height: self.minimum_height
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Button:
+                            text:"Add"
+                            on_release:app.add_component()
+                        Button:
+                            text:"Remove"
+                            on_release: app.remove_component()
+                BoxLayout:
+                    id: box_top_center
+                    Button:
+                        text:"Home"
+                        on_release:app.home_plot()
+                    ToggleButton:
+                        group:'touch_mode'
+                        text:"Zoom Mode"
+                        on_release:
+                            app.set_touch_mode('zoombox')
+                            self.state='down'
+                    ToggleButton:
+                        group:'touch_mode'
+                        text:"Pick Component"
+                        on_release:
+                            app.set_touch_mode('pointselect')
+                            self.state='down'
+                BoxLayout
+                    id: box_top_right
+            BoxLayout:
+                orientation: 'horizontal'
+                padding: 20
+                BoxLayout:
+                    id: box_left
+                    MatplotFigure:
+                        id: figure_left
+                BoxLayout:
+                    id: box_center
+                    MatplotFigure:
+                        id: figure_center
+                BoxLayout
+                    id: box_right
+                    MatplotFigure:
+                        id: figure_right
+
+
