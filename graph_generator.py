@@ -11,7 +11,8 @@ from astropy.io import fits
 from astropy.modeling import models, fitting
 import os
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+from kinematics import Component
+from astropy.time import Time
 
 #optimized draw on Agg backend
 mpl.rcParams['path.simplify'] = True
@@ -25,7 +26,23 @@ mpl.rcParams['font.family'] = 'Quicksand'
 mpl.rcParams['axes.linewidth'] = 1.0
 
 font_size_axis_title=dp(13)
-font_size_axis_tick=dp(12)        
+font_size_axis_tick=dp(12)
+
+class KinematicPlot(object):
+    def __init__(self):
+
+        super().__init__()
+        self.fig, self.ax = plt.subplots(1, 1)
+        self.ax.set_xlabel('MJD [days]',fontsize=font_size_axis_title)
+        self.ax.set_ylabel('Distance from Core [mas]',fontsize=font_size_axis_title)
+        self.fig.subplots_adjust(left=0.13,top=0.96,right=0.93,bottom=0.2)
+
+    def plot_component(self,component,color):
+        distance_to_core=np.sqrt(component.x**2+component.y**2)
+        self.ax.scatter(component.mjd,distance_to_core,color=color)
+
+
+
 
 class FitsImage(object):
     """class that generate Matplotlib graph."""
@@ -42,6 +59,9 @@ class FitsImage(object):
 
         self.components=[]
 
+        #component default color
+        self.component_color = "black"
+
         # Define some variables (create gui for it later)
         fit_noise = True  # if True, the noise value and rms deviation will be fitted as described in the PhD-thesis of Moritz Böck (https://www.physik.uni-wuerzburg.de/fileadmin/11030400/Dissertation_Boeck.pdf); if False, the noise frome difmap will be used
 
@@ -51,6 +71,8 @@ class FitsImage(object):
         contour_cmap = None  # matplotlib colormap string
         contour_alpha = 1  # transparency
         contour_width = 0.5  # contour linewidth
+
+
 
         # Image colormap
         self.im_colormap = False  # if True, a image colormap will be done
@@ -194,7 +216,11 @@ class FitsImage(object):
         self.ax.add_artist(beam)
 
         #plot_date
-        self.plot_date(date_x,date_y,hdu_list)
+        date=self.get_date(hdu_list)
+        if self.im_colormap == True:
+            self.ax.text(date_x, date_y, date, color='grey', ha='right', va='top')
+        else:
+            self.ax.text(date_x, date_y, date, color='black', ha='right', va='top')
 
         # Plot name
         if self.im_colormap == True:
@@ -204,28 +230,18 @@ class FitsImage(object):
 
         # Read modelfit files in
         if (overplot_gauss == True) or (overplot_clean == True):
-            hdu_list1 = fits.open(model_image_file)
-            mod = hdu_list1[1].data
-            mod = np.array(mod)
-            mod = mod.view((mod.dtype[0], len(mod.dtype.names)))
-            mod = np.transpose(mod, [1, 0])
+            model_df=self.getComponentInfo(model_image_file)
 
-            # Sorting of Gaussian and clean components
-            cond_g = mod[3] > 0
-            cond_c = mod[3] == 0
-
-            g_x = np.extract(cond_g, mod[1])
-            g_y = np.extract(cond_g, mod[2])
-            g_maj = np.extract(cond_g, mod[3])
-            g_min = np.extract(cond_g, mod[4])
-            g_pos = np.extract(cond_g, mod[5])
-
-            c_flux = np.extract(cond_c, mod[0])
-            c_x = np.extract(cond_c, mod[1])
-            c_y = np.extract(cond_c, mod[2])
+            #sort in gauss and clean components
+            model_gauss_df = model_df[model_df["Major_axis"] > 0.].reset_index()
+            model_clean_df = model_df[model_df["Major_axis"] == 0.].reset_index()
 
             # Overplot clean components
             if overplot_clean == True:
+                c_x = model_clean_df["Delta_x"]
+                c_y = model_clean_df["Delta_y"]
+                c_flux = model_clean_df["Flux"]
+
                 for j in range(len(c_x)):
                     if c_flux[j] < 0.:
                         self.ax.plot(c_x[j] * scale, c_y[j] * scale, marker='+', color='red', alpha=clean_alpha,
@@ -236,12 +252,22 @@ class FitsImage(object):
 
             # Overplot Gaussian components
             if overplot_gauss == True:
+
+                g_x = model_gauss_df["Delta_x"]
+                g_y = model_gauss_df["Delta_y"]
+                g_maj = model_gauss_df["Major_axis"]
+                g_min = model_gauss_df["Minor_axis"]
+                g_pos = model_gauss_df["PA"]
+                g_flux = model_gauss_df["Flux"]
+                g_date = model_gauss_df["Date"]
+                g_mjd = model_gauss_df["mjd"]
+                g_year = model_gauss_df["Year"]
+
                 for j in range(len(g_x)):
                     #plot component
-                    component = self.plotComponent(g_x[j],g_y[j],g_maj[j],g_min[j],g_pos[j],scale)
-                    self.components.append(component)
-
-            hdu_list1.close()
+                    component_plot = self.plotComponent(g_x[j],g_y[j],g_maj[j],g_min[j],g_pos[j],scale)
+                    component=Component(g_x[j],g_y[j],g_maj[j],g_min[j],g_pos[j],g_flux[j],g_date[j],g_mjd[j],g_year[j])
+                    self.components.append([component_plot,component])
 
         hdu_list.close()
 
@@ -262,7 +288,7 @@ class FitsImage(object):
 
         # Plotting ellipses
         comp = Ellipse([x * scale, y * scale], maj * scale, min * scale, -pos + 90,
-                       fill=False, zorder=2, color='black', lw=0.5)
+                       fill=False, zorder=2, color=self.component_color, lw=0.5)
         ellipse=self.ax.add_artist(comp)
 
         # Plotting axes of the ellipses
@@ -276,12 +302,12 @@ class FitsImage(object):
         min2_x = x + np.sin(-np.pi / 180 * (pos + 90)) * min * 0.5
         min2_y = y - np.cos(-np.pi / 180 * (pos + 90)) * min * 0.5
 
-        line1=self.ax.plot([maj1_x * scale, maj2_x * scale], [maj1_y * scale, maj2_y * scale], color='black', lw=0.5)
-        line2=self.ax.plot([min1_x * scale, min2_x * scale], [min1_y * scale, min2_y * scale], color='black', lw=0.5)
+        line1=self.ax.plot([maj1_x * scale, maj2_x * scale], [maj1_y * scale, maj2_y * scale], color=self.component_color, lw=0.5)
+        line2=self.ax.plot([min1_x * scale, min2_x * scale], [min1_y * scale, min2_y * scale], color=self.component_color, lw=0.5)
 
 
         return [ellipse,line1,line2]
-    def plot_date(self,x,y,hdu_list):
+    def get_date(self,hdu_list):
 
         # Plot date
         time = hdu_list[0].header["DATE-OBS"]
@@ -306,10 +332,36 @@ class FitsImage(object):
             elif len(time[2]) == 4:
                 year = time[2]
             date = year + "-" + month + "-" + day
-        if self.im_colormap == True:
-            self.ax.text(x, y, date, color='grey', ha='right', va='top')
+        return date
+
+    #gets components from .fits file
+    def getComponentInfo(self,filename):
+        data_df = pd.DataFrame()
+        hdu_list = fits.open(filename)
+        comp_data = hdu_list[1].data
+        comp_data1 = np.zeros((len(comp_data), len(comp_data[0])))
+        date = np.array([])
+        year = np.array([])
+        mjd = np.array([])
+        for j in range(len(comp_data)):
+            comp_data1[j, :] = comp_data[j]
+            date1=self.get_date(hdu_list)
+            date = np.append(date, date1)
+            t = Time(date1)
+            year = np.append(year, t.jyear)
+            mjd = np.append(mjd, t.mjd)
+        comp_data1_df = pd.DataFrame(data=comp_data1,
+                                     columns=["Flux", "Delta_x", "Delta_y", "Major_axis", "Minor_axis", "PA",
+                                              "Typ_obj"])
+        comp_data1_df["Date"] = date
+        comp_data1_df["Year"] = year
+        comp_data1_df["mjd"] = mjd
+        comp_data1_df.sort_values(by=["Delta_x", "Delta_y"], ascending=False, inplace=True)
+        if data_df.empty:
+            data_df = comp_data1_df
         else:
-            self.ax.text(x, y, date, color='black', ha='right', va='top')
+            data_df = pd.concat([data_df, comp_data1_df], axis=0, ignore_index=True)
+        return data_df
 
 
                 

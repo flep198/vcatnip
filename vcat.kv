@@ -83,6 +83,8 @@
                         Button:
                             text:"Remove"
                             on_release: app.remove_component()
+                        Button:
+                            text:"Reset Index"
                 BoxLayout:
                     id: box_top_center
                     Button:
@@ -102,20 +104,11 @@
                             self.state='down'
                 BoxLayout
                     id: box_top_right
+                    MatplotFigure:
+                        id: kinematic_plot
             BoxLayout:
                 orientation: 'horizontal'
                 padding: 20
-                BoxLayout:
-                    id: box_left
-                    MatplotFigure:
-                        id: figure_left
-                BoxLayout:
-                    id: box_center
-                    MatplotFigure:
-                        id: figure_center
-                BoxLayout
-                    id: box_right
-                    MatplotFigure:
-                        id: figure_right
+                id: figures
 
 
