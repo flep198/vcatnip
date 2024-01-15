@@ -765,7 +765,7 @@ class MatplotFigure(Widget):
                 elif self.touch_mode=='pointselect':
                     trans = self.axes.transData.inverted()
                     xdata, ydata = trans.transform_point((x - self.pos[0],y - self.pos[1]))
-                    self.parent.parent.parent.parent.choose_component(self,xdata,ydata)
+                    self.parent.parent.parent.parent.parent.choose_component(self,xdata,ydata)
 
                 event.grab(self)
                 self._touches.append(event)

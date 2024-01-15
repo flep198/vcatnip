@@ -33,13 +33,21 @@ class KinematicPlot(object):
 
         super().__init__()
         self.fig, self.ax = plt.subplots(1, 1)
-        self.ax.set_xlabel('MJD [days]',fontsize=font_size_axis_title)
+        self.ax.set_xlabel('Time [year]',fontsize=font_size_axis_title)
         self.ax.set_ylabel('Distance from Core [mas]',fontsize=font_size_axis_title)
         self.fig.subplots_adjust(left=0.13,top=0.96,right=0.93,bottom=0.2)
 
-    def plot_component(self,component,color):
-        distance_to_core=np.sqrt(component.x**2+component.y**2)
-        self.ax.scatter(component.mjd,distance_to_core,color=color)
+
+    def plot_component_collection(self,component_collection,color):
+        self.ax.scatter(component_collection.year,component_collection.dist,c=color)
+
+    def set_limits(self,x,y):
+        self.ax.set_xlim(x)
+        self.ax.set_ylim(y)
+    def plot_linear_fit(self,x_min,x_max,slope,y0,color,label=""):
+        def y(x):
+            return slope*x+y0
+        self.ax.plot([x_min,x_max],[y(x_min),y(x_max)],color,label=label)
 
 
 
@@ -96,7 +104,7 @@ class FitsImage(object):
         hdu_list = fits.open(clean_image_file)
 
         # Set name
-        name = hdu_list[0].header["OBJECT"]
+        self.name = hdu_list[0].header["OBJECT"]
 
 
         # Unit selection and adjustment
@@ -224,9 +232,9 @@ class FitsImage(object):
 
         # Plot name
         if self.im_colormap == True:
-            self.ax.text(name_x, name_y, name, color='grey', ha='left', va='top')
+            self.ax.text(name_x, name_y, self.name, color='grey', ha='left', va='top')
         else:
-            self.ax.text(name_x, name_y, name, color='black', ha='left', va='top')
+            self.ax.text(name_x, name_y, self.name, color='black', ha='left', va='top')
 
         # Read modelfit files in
         if (overplot_gauss == True) or (overplot_clean == True):
@@ -266,7 +274,7 @@ class FitsImage(object):
                 for j in range(len(g_x)):
                     #plot component
                     component_plot = self.plotComponent(g_x[j],g_y[j],g_maj[j],g_min[j],g_pos[j],scale)
-                    component=Component(g_x[j],g_y[j],g_maj[j],g_min[j],g_pos[j],g_flux[j],g_date[j],g_mjd[j],g_year[j])
+                    component=Component(g_x[j],g_y[j],g_maj[j],g_min[j],g_pos[j],g_flux[j],g_date[j],g_mjd[j],g_year[j],scale=scale)
                     self.components.append([component_plot,component])
 
         hdu_list.close()

@@ -54,7 +54,7 @@
                 text: ''
                 size_hint_x: 0.2
     TabbedPanelItem:
-        text: 'View'
+        text: 'Kinematics'
         background_color: (1, .5, 0, 1)
         background_normal: ''
         BoxLayout:
@@ -85,30 +85,52 @@
                             on_release: app.remove_component()
                         Button:
                             text:"Reset Index"
+                        Button:
+                            text:"Set Core"
+                            on_release:app.set_core_component()
                 BoxLayout:
                     id: box_top_center
-                    Button:
-                        text:"Home"
-                        on_release:app.home_plot()
-                    ToggleButton:
-                        group:'touch_mode'
-                        text:"Zoom Mode"
-                        on_release:
-                            app.set_touch_mode('zoombox')
-                            self.state='down'
-                    ToggleButton:
-                        group:'touch_mode'
-                        text:"Pick Component"
-                        on_release:
-                            app.set_touch_mode('pointselect')
-                            self.state='down'
+                    orientation: "vertical"
+                    BoxLayout:
+                        size_hint_y: 0.2
+                        TextInput:
+                            id: redshift
+                            text: "0.00"
+                            on_text: app.update_redshift()
+                        Button:
+                            text:"Get Redshift from NED"
+                            on_release: app.get_redshift()
+                    BoxLayout:
+                        size_hint_y: 0.8
+                        Button:
+                            text:"Home"
+                            on_release: app.home_plot()
+                        ToggleButton:
+                            group:'touch_mode'
+                            text:"Zoom Mode"
+                            on_release:
+                                app.set_touch_mode('zoombox')
+                                self.state='down'
+                        ToggleButton:
+                            group:'touch_mode'
+                            text:"Pick Component"
+                            on_release:
+                                app.set_touch_mode('pointselect')
+                                self.state='down'
                 BoxLayout
                     id: box_top_right
                     MatplotFigure:
                         id: kinematic_plot
-            BoxLayout:
-                orientation: 'horizontal'
-                padding: 20
-                id: figures
+            ScrollView:
+                size: self.size
+                padding: 50
+                GridLayout:
+                    size_hint_x: None
+                    rows: 1
+                    id: figures
+                    width: self.minimum_width
+
+
+
 
 
