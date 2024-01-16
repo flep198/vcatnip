@@ -58,6 +58,7 @@
         background_color: (1, .5, 0, 1)
         background_normal: ''
         BoxLayout:
+            id: main_box
             orientation: 'vertical'
             BoxLayout:
                 orientation: 'horizontal'
@@ -122,12 +123,17 @@
                     MatplotFigure:
                         id: kinematic_plot
             ScrollView:
+                id: figure_scroll
+                do_scroll_y: False
+                do_scroll_x: True
                 size: self.size
+                scroll_type: ['bars','content']
                 padding: 50
                 GridLayout:
                     size_hint_x: None
                     rows: 1
                     id: figures
+                    spacing: 50
                     width: self.minimum_width
 
 

@@ -263,6 +263,9 @@ class ModelFits(TabbedPanel):
             for comp in plot.components:
                 comp[1].redshift=self.redshift
 
+        if len(self.components)>0:
+            self.update_kinematic_plot()
+
 
 class VCAT(App):
 
@@ -271,8 +274,15 @@ class VCAT(App):
         return self.screen
 
     def set_touch_mode(self,touch_mode):
-        for figure in self.screen.figure_widgets:
-            figure.touch_mode = touch_mode
+        if touch_mode == "zoombox":
+            for figure in self.screen.figure_widgets:
+                figure.touch_mode = "pan"
+                self.screen.ids.figure_scroll.do_scroll_x = False
+                #self.screen.ids.figure_scroll.update_canvas()
+        if touch_mode == "pointselect":
+            for figure in self.screen.figure_widgets:
+                figure.touch_mode = "pointselect"
+                self.screen.ids.figure_scroll.do_scroll_x = True
 
     def home_plot(self):
         for figure in self.screen.figure_widgets:
@@ -295,6 +305,7 @@ class VCAT(App):
 
     def update_redshift(self):
         self.screen.update_redshift()
+
 
 if __name__ == "__main__":
     VCAT().run()
