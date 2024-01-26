@@ -102,7 +102,29 @@
                             text:"Get Redshift from NED"
                             on_release: app.get_redshift()
                     BoxLayout:
-                        size_hint_y: 0.8
+                        orientation: "vertical"
+                        size_hint_y: 0.7
+                        BoxLayout:
+                            size_hint_y: 0.1
+                            orientation: "horizontal"
+                            Label:
+                                text: "Component ID"
+                            Label:
+                                text: "⁠β_app"
+                            Label:
+                                text: "D_crit"
+                        ScrollView:
+                            size: self.size
+                            size_hint_y: 0.9
+                            id: scroll_kinematic
+                            GridLayout:
+                                size_hint_y: None
+                                cols: 1
+                                id: kinematic_list
+                                height: self.minimum_height
+
+                    BoxLayout:
+                        size_hint_y: 0.1
                         Button:
                             text:"Home"
                             on_release: app.home_plot()

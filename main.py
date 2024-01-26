@@ -2,6 +2,8 @@ from kivy.app import App
 from kivy.uix.popup import Popup
 from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.tabbedpanel import TabbedPanel
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
 from kivy.properties import ObjectProperty, StringProperty, ListProperty
 from graph_widget import MatplotFigure
@@ -79,6 +81,30 @@ class ModelFits(TabbedPanel):
         button.bind(on_release=self.set_active_component)
         self.ids.component_list.add_widget(button)
 
+        #create list entry in kinematic table
+
+        box_id="kinematic"+str(count)
+        box=BoxLayout(orientation="horizontal",
+                      size_hint_y=None,
+                      height=50)
+
+        #Name Field
+        label_id=box_id+"_id"
+        component_id_label=Label(text=str(count))
+        box.add_widget(component_id_label)
+
+        #Speed Field
+        label_id = box_id + "_speed"
+        component_id_label = Label(text="")
+        box.add_widget(component_id_label)
+
+        #Doppler Field
+        label_id = box_id + "_doppler"
+        component_id_label = Label(text="")
+        box.add_widget(component_id_label)
+
+        self.ids.kinematic_list.add_widget(box)
+
 
     def remove_component(self):
         #find active button
@@ -114,7 +140,14 @@ class ModelFits(TabbedPanel):
                         plot.ax.figure.canvas.draw_idle()
                         plot.ax.figure.canvas.flush_events()
 
+        #remove component from kinematic table
+        for box in self.ids.kinematic_list.children:
+            for row in box.children:
+                if row.text == str(ind_to_remove):
+                    self.ids.kinematic_list.remove_widget(box)
+
         self.update_kinematic_plot()
+
 
     def choose_component(self,figure_widget,x,y):
 
@@ -215,34 +248,48 @@ class ModelFits(TabbedPanel):
         self.update_core_dist()
 
         t_max=0
-        t_min=self.plots[0].components[0][1].year
-        d_max=0
-        for i in range(len(self.components)):
-            collection=[]
-            for plot in self.plots:
-                for comp in plot.components:
-                    if comp[1].component_number == i:
-                        collection.append(comp[1])
-                        # determine plot limits
-                        if comp[1].year > t_max:
-                            t_max = comp[1].year
-                        if comp[1].year < t_min:
-                            t_min = comp[1].year
-                        if comp[1].distance_to_core*comp[1].scale > d_max:
-                            d_max = comp[1].distance_to_core*comp[1].scale
-            comp_collection=ComponentCollection(collection)
-            self.kplot.plot_component_collection(comp_collection,self.current_color(i))
-            fit_data = comp_collection.get_speed()
-            if len(collection)>2:
-                self.kplot.plot_linear_fit(t_min-0.1*(t_max-t_min),t_max+0.1*(t_max-t_min),
-                                           fit_data["speed"],
-                                           fit_data["y0"],self.current_color(i),
-                                           label=self.components[i])
+        if len(self.plots)>0:
+            t_min=self.plots[0].components[0][1].year
+            d_max=0
+            for i in range(len(self.components)):
+                collection=[]
+                for plot in self.plots:
+                    for comp in plot.components:
+                        if comp[1].component_number == i:
+                            collection.append(comp[1])
+                            # determine plot limits
+                            if comp[1].year > t_max:
+                                t_max = comp[1].year
+                            if comp[1].year < t_min:
+                                t_min = comp[1].year
+                            if comp[1].distance_to_core*comp[1].scale > d_max:
+                                d_max = comp[1].distance_to_core*comp[1].scale
+                comp_collection=ComponentCollection(collection)
+                self.kplot.plot_component_collection(comp_collection,self.current_color(i))
+                fit_data = comp_collection.get_speed()
+                if len(collection)>2:
+                    self.kplot.plot_linear_fit(t_min-0.1*(t_max-t_min),t_max+0.1*(t_max-t_min),
+                                            fit_data["speed"],
+                                            fit_data["y0"],self.current_color(i),
+                                            label=self.components[i])
 
-        self.kplot.set_limits([t_min-0.1*(t_max-t_min),t_max+0.1*(t_max-t_min)],[0,1.2*d_max])
-        self.kplot.ax.legend()
-        self.kplot.ax.figure.canvas.draw_idle()
-        self.kplot.ax.figure.canvas.flush_events()
+                #write data to table
+                for row in self.ids.kinematic_list.children:
+                    for label in row.children:
+                        if label.text == str(i):
+                            final_row=row
+                try:
+                    labels=final_row.children
+                    labels[1].text="("+"{:.2f}".format(float(fit_data["beta_app"]))+" +/- "+"{:.2f}".format(float(fit_data["beta_app_err"]))+")c"
+                    labels[0].text="{:.2f}".format(float(fit_data["d_crit"]))+" +/- "+"{:.2f}".format(float(fit_data["d_crit_err"]))
+                except:
+                    pass
+
+
+            self.kplot.set_limits([t_min-0.1*(t_max-t_min),t_max+0.1*(t_max-t_min)],[0,1.2*d_max])
+            self.kplot.ax.legend()
+            self.kplot.ax.figure.canvas.draw_idle()
+            self.kplot.ax.figure.canvas.flush_events()
 
     def get_redshift(self):
 
@@ -257,7 +304,10 @@ class ModelFits(TabbedPanel):
 
     def update_redshift(self):
 
-        self.redshift = float(self.ids.redshift.text)
+        try:
+            self.redshift = float(self.ids.redshift.text)
+        except:
+            pass
         #set redshift of components
         for plot in self.plots:
             for comp in plot.components:

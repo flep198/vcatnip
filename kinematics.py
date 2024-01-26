@@ -112,5 +112,5 @@ class ComponentCollection():
             red_chi_sqr = 0
 
         return {"speed": speed, "speed_err": speed_err, "y0": y0, "y0_err": y0_err,
-                "beta_app": beta_app, "beta_app_err": beta_app_err, "d_crit": d_crit, "d_Crit_err": d_crit_err,
+                "beta_app": beta_app, "beta_app_err": beta_app_err, "d_crit": d_crit, "d_crit_err": d_crit_err,
                 "dist_0_est": dist_0_est, "t_0": t_0, "t_0_err": t_0_err, "red_chi_sqr": red_chi_sqr}
