@@ -33,13 +33,29 @@ class KinematicPlot(object):
 
         super().__init__()
         self.fig, self.ax = plt.subplots(1, 1)
-        self.ax.set_xlabel('Time [year]',fontsize=font_size_axis_title)
-        self.ax.set_ylabel('Distance from Core [mas]',fontsize=font_size_axis_title)
         self.fig.subplots_adjust(left=0.13,top=0.96,right=0.93,bottom=0.2)
 
 
-    def plot_component_collection(self,component_collection,color):
-        self.ax.scatter(component_collection.year,component_collection.dist,c=color)
+    def plot_kinematics(self,component_collection,color):
+        if component_collection.length()>0:
+            self.ax.scatter(component_collection.year,component_collection.dist,c=color,marker=".")
+        self.ax.set_xlabel('Time [year]', fontsize=font_size_axis_title)
+        self.ax.set_ylabel('Distance from Core [mas]', fontsize=font_size_axis_title)
+
+    def plot_fluxs(self,component_collection,color):
+        if component_collection.length() > 0:
+            self.ax.plot(component_collection.year, component_collection.fluxs, c=color, label=component_collection.name,marker=".")
+        self.ax.set_xlabel('Time [year]', fontsize=font_size_axis_title)
+        self.ax.set_ylabel('Flux Density [Jy]', fontsize=font_size_axis_title)
+
+    def plot_tbs(self,component_collection,color):
+        if component_collection.length() > 0:
+            self.ax.scatter(component_collection.year, component_collection.tbs, c=color, label=component_collection.name)
+        self.ax.set_xlabel('Time [year]', fontsize=font_size_axis_title)
+        self.ax.set_ylabel('Brightness Temperature [K]', fontsize=font_size_axis_title)
+        self.ax.set_yscale("log")
+
+
 
     def set_limits(self,x,y):
         self.ax.set_xlim(x)
@@ -105,6 +121,8 @@ class FitsImage(object):
 
         # Set name
         self.name = hdu_list[0].header["OBJECT"]
+
+        self.freq = float(hdu_list[0].header["CRVAL3"]) #frequency in Hertz
 
 
         # Unit selection and adjustment
@@ -225,16 +243,24 @@ class FitsImage(object):
 
         #plot_date
         date=self.get_date(hdu_list)
+
+        self.ax.set_title(date, fontsize=font_size_axis_title)
+
+        """
         if self.im_colormap == True:
             self.ax.text(date_x, date_y, date, color='grey', ha='right', va='top')
         else:
             self.ax.text(date_x, date_y, date, color='black', ha='right', va='top')
+        """
 
+        """
         # Plot name
         if self.im_colormap == True:
             self.ax.text(name_x, name_y, self.name, color='grey', ha='left', va='top')
         else:
             self.ax.text(name_x, name_y, self.name, color='black', ha='left', va='top')
+        """
+
 
         # Read modelfit files in
         if (overplot_gauss == True) or (overplot_clean == True):
@@ -274,7 +300,7 @@ class FitsImage(object):
                 for j in range(len(g_x)):
                     #plot component
                     component_plot = self.plotComponent(g_x[j],g_y[j],g_maj[j],g_min[j],g_pos[j],scale)
-                    component=Component(g_x[j],g_y[j],g_maj[j],g_min[j],g_pos[j],g_flux[j],g_date[j],g_mjd[j],g_year[j],scale=scale)
+                    component=Component(g_x[j],g_y[j],g_maj[j],g_min[j],g_pos[j],g_flux[j],g_date[j],g_mjd[j],g_year[j],scale=scale,freq=self.freq)
                     self.components.append([component_plot,component])
 
         hdu_list.close()
@@ -291,6 +317,7 @@ class FitsImage(object):
         self.ax.invert_xaxis()
         self.ax.set_xlabel('Relative R.A. [' + unit + ']',fontsize=font_size_axis_title)
         self.ax.set_ylabel('Relative DEC. [' + unit + ']',fontsize=font_size_axis_title)
+        self.fig.tight_layout()
 
     def plotComponent(self,x,y,maj,min,pos,scale):
 

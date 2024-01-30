@@ -14,6 +14,7 @@ import numpy as np
 from kivy.lang import Builder
 from graph_generator import FitsImage, KinematicPlot
 from astroquery.ipac.ned import Ned
+from astropy.io import fits
 
 #avoid conflict between mouse provider and touch (very important with touch device)
 #no need for android platform
@@ -24,9 +25,13 @@ if platform != 'android':
 class FileChoosePopup(Popup):
     load = ObjectProperty()
 
+class FileSavePopup(Popup):
+    load = ObjectProperty
+
 class ModelFits(TabbedPanel):
     file_info = StringProperty("No file chosen")
     the_popup = ObjectProperty(None)
+    save_dialog = ObjectProperty(None)
     filepaths = ListProperty([])
     plots = []
     components = []
@@ -46,6 +51,11 @@ class ModelFits(TabbedPanel):
     def open_popup(self):
         self.the_popup = FileChoosePopup(load=self.load)
         self.the_popup.open()
+
+    def open_save_dialog(self):
+        self.save_dialog = FileSavePopup()
+        self.save_dialog.open()
+
     def load(self, selection):
         self.plots=[]
         self.filepaths = selection
@@ -53,10 +63,21 @@ class ModelFits(TabbedPanel):
         self.file_info=str(len(self.filepaths))+" Files selected"
         self.ids.get_file.text = self.file_info
 
+        #sort files by date
+        date=[]
+        fits_images=[]
 
         #create plots for view page
         for filepath in self.filepaths:
             plot=FitsImage(filepath,filepath)
+            date=np.append(date,plot.get_date(fits.open(filepath)))
+            fits_images=np.append(fits_images,plot)
+
+        #sort them according to obsdate
+        args=date.argsort()
+        fits_images=fits_images[args]
+
+        for plot in fits_images:
             self.plots.append(plot)
             self.name=plot.name
             new_figure=MatplotFigure(size_hint_x=None,
@@ -243,6 +264,7 @@ class ModelFits(TabbedPanel):
 
 
     def update_kinematic_plot(self):
+
         #currently creates a new plot everytime => maybe rewrite to just update existing plot?
         self.kplot=KinematicPlot()
         self.ids.kinematic_plot.figure=self.kplot.fig
@@ -253,6 +275,9 @@ class ModelFits(TabbedPanel):
         if len(self.plots)>0:
             t_min=self.plots[0].components[0][1].year
             d_max=0
+            tb_max=0
+            tb_min=self.plots[0].components[0][1].tb
+            flux_max=0
             for i in range(len(self.components)):
                 collection=[]
                 for plot in self.plots:
@@ -266,10 +291,33 @@ class ModelFits(TabbedPanel):
                                 t_min = comp[1].year
                             if comp[1].distance_to_core*comp[1].scale > d_max:
                                 d_max = comp[1].distance_to_core*comp[1].scale
-                comp_collection=ComponentCollection(collection)
-                self.kplot.plot_component_collection(comp_collection,self.current_color(i))
+                            if comp[1].tb > tb_max:
+                                tb_max = comp[1].tb
+                            if comp[1].tb < tb_min:
+                                tb_min = comp[1].tb
+                            if comp[1].flux > flux_max:
+                                flux_max = comp[1].flux
+
+                comp_collection=ComponentCollection(collection,name=self.components[i])
+
+                # find out which plot is currently selected:
+                active_button = next((t for t in ToggleButton.get_widgets('kinematic_select') if t.state == 'down'), None)
+
+                if active_button.text == "Flux Density":
+                    self.kplot.plot_fluxs(comp_collection,self.current_color(i))
+                    self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
+                                          [0, 1.2 * flux_max])
+                elif active_button.text == "Brightness Temperature":
+                    self.kplot.plot_tbs(comp_collection,self.current_color(i))
+                    self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
+                                          [tb_min, 10 * tb_max])
+                else:
+                    self.kplot.plot_kinematics(comp_collection,self.current_color(i))
+                    self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
+                                          [0, 1.2 * d_max])
+
                 fit_data = comp_collection.get_speed()
-                if len(collection)>2:
+                if len(collection)>2 and active_button.text == "Kinematic":
                     self.kplot.plot_linear_fit(t_min-0.1*(t_max-t_min),t_max+0.1*(t_max-t_min),
                                             fit_data["speed"],
                                             fit_data["y0"],self.current_color(i),
@@ -288,8 +336,6 @@ class ModelFits(TabbedPanel):
                 except:
                     pass
 
-
-            self.kplot.set_limits([t_min-0.1*(t_max-t_min),t_max+0.1*(t_max-t_min)],[0,1.2*d_max])
             self.kplot.ax.legend()
             self.kplot.ax.figure.canvas.draw_idle()
             self.kplot.ax.figure.canvas.flush_events()
@@ -315,6 +361,7 @@ class ModelFits(TabbedPanel):
         for plot in self.plots:
             for comp in plot.components:
                 comp[1].redshift=self.redshift
+                comp[1].tb=1.22e12/15**2 * comp[1].flux * (1 + self.redshift) / comp[1].maj / comp[1].min /(comp[1].scale)**2
 
         if len(self.components)>0:
             self.update_kinematic_plot()
@@ -358,6 +405,9 @@ class VCAT(App):
 
     def update_redshift(self):
         self.screen.update_redshift()
+
+    def update_kinematic_plot(self):
+        self.screen.update_kinematic_plot()
 
 
 if __name__ == "__main__":

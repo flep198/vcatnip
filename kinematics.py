@@ -7,7 +7,7 @@ import pandas as pd
 
 class Component():
     def __init__(self, x, y, maj, min, pos, flux, date, mjd, year, delta_x_est=0, delta_y_est=0,
-                 component_number=-1, is_core=False, redshift=0, scale=60 * 60 * 10 ** 3):
+                 component_number=-1, is_core=False, redshift=0, scale=60 * 60 * 10 ** 3,freq=15e9):
         self.x = x
         self.y = y
         self.mjd = mjd
@@ -24,7 +24,8 @@ class Component():
         self.delta_y_est = self.y
         self.distance_to_core = np.sqrt(self.delta_x_est ** 2 + self.delta_y_est ** 2)
         self.redshift = redshift
-        self.tb = 5.44e9 * self.flux * (1 + self.redshift) / self.maj / self.min
+        self.freq=freq
+        self.tb = 1.22e12/(self.freq*1e-9)**2 * self.flux * (1 + self.redshift) / self.maj / self.min /(scale)**2  #Kovalev et al. 2005
         self.scale = scale
 
     def set_distance_to_core(self, core_x, core_y):
@@ -53,6 +54,9 @@ class ComponentCollection():
         self.time = []
         self.xs = []
         self.ys = []
+        self.fluxs = []
+        self.tbs = []
+
 
         for comp in components:
             self.year.append(comp.year)
@@ -60,6 +64,8 @@ class ComponentCollection():
             self.dist_err.append(comp.maj / 2 * self.scale)
             self.xs.append(comp.delta_x_est)
             self.ys.append(comp.delta_y_est)
+            self.fluxs.append(comp.flux)
+            self.tbs.append(comp.tb)
 
     def length(self):
         return len(self.components)
