@@ -94,12 +94,14 @@ class ModelFits(TabbedPanel):
         box.add_widget(component_id_label)
 
         #Speed Field
-        label_id = box_id + "_speed"
+        component_id_label=Label(text="")
+        box.add_widget(component_id_label)
+
+        #Beta_app Field
         component_id_label = Label(text="")
         box.add_widget(component_id_label)
 
         #Doppler Field
-        label_id = box_id + "_doppler"
         component_id_label = Label(text="")
         box.add_widget(component_id_label)
 
@@ -280,7 +282,8 @@ class ModelFits(TabbedPanel):
                             final_row=row
                 try:
                     labels=final_row.children
-                    labels[1].text="("+"{:.2f}".format(float(fit_data["beta_app"]))+" +/- "+"{:.2f}".format(float(fit_data["beta_app_err"]))+")c"
+                    labels[2].text="{:.2f}".format(float(fit_data["speed"]))+" +/- "+"{:.2f}".format(float(fit_data["speed_err"]))
+                    labels[1].text="{:.2f}".format(float(fit_data["beta_app"]))+" +/- "+"{:.2f}".format(float(fit_data["beta_app_err"]))
                     labels[0].text="{:.2f}".format(float(fit_data["d_crit"]))+" +/- "+"{:.2f}".format(float(fit_data["d_crit_err"]))
                 except:
                     pass
