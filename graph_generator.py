@@ -398,5 +398,9 @@ class FitsImage(object):
             data_df = pd.concat([data_df, comp_data1_df], axis=0, ignore_index=True)
         return data_df
 
+    def change_plot_lim(self,x_min,x_max,y_min,y_max):
+        self.ax.set_xlim(x_min, x_max)
+        self.ax.set_ylim(y_min, y_max)
+
 
                 

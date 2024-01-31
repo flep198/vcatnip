@@ -70,6 +70,7 @@ class ModelFits(TabbedPanel):
         self.import_dialog = FileImportPopup()
         self.import_dialog.open()
 
+
     def load(self, selection):
         self.plots=[]
         self.filepaths = selection
@@ -103,6 +104,24 @@ class ModelFits(TabbedPanel):
             new_figure.touch_mode="pan"
             self.ids.figures.add_widget(new_figure)
             self.figure_widgets.append(new_figure)
+
+    def change_plot_lims(self):
+        #try since the text might be no numbers
+
+        try:
+            ra_min = float(self.ids.input_ra_min.text)
+            ra_max = float(self.ids.input_ra_max.text)
+            dec_min = float(self.ids.input_dec_min.text)
+            dec_max = float(self.ids.input_dec_max.text)
+
+            for plot in self.plots:
+                plot.change_plot_lim(ra_max,ra_min,dec_min,dec_max)
+                plot.ax.figure.canvas.draw_idle()
+                plot.ax.figure.canvas.flush_events()
+        except:
+            pass
+
+
 
     def add_component(self):
         count= len(self.components)

@@ -206,6 +206,28 @@
                                 height: self.minimum_height
                     BoxLayout:
                         size_hint_y: 0.1
+                        orientation: "horizontal"
+                        Label:
+                            text: "RA min"
+                        TextInput:
+                            id: input_ra_min
+                        Label:
+                            text: "RA max"
+                        TextInput:
+                            id: input_ra_max
+                        Label:
+                            text: "DEC min"
+                        TextInput:
+                            id: input_dec_min
+                        Label:
+                            text: "DEC max"
+                        TextInput:
+                            id: input_dec_max
+                        Button:
+                            text: "Apply"
+                            on_release: root.change_plot_lims()
+                    BoxLayout:
+                        size_hint_y: 0.1
                         Button:
                             text:"Home"
                             on_release: app.home_plot()
