@@ -283,7 +283,7 @@ class ModelFits(TabbedPanel):
             self.active_component_ind = None
 
 
-    def update_kinematic_plot(self):
+    def update_kinematic_plot(self,do_export=False,export_path=""):
 
         #currently creates a new plot everytime => maybe rewrite to just update existing plot?
         self.kplot=KinematicPlot()
@@ -358,8 +358,15 @@ class ModelFits(TabbedPanel):
                     pass
 
             self.kplot.ax.legend()
+            self.kplot.ax.set_title(self.name)
+            self.kplot.fig.tight_layout()
             self.kplot.ax.figure.canvas.draw_idle()
             self.kplot.ax.figure.canvas.flush_events()
+
+            #export the plot as pdf and png
+            if do_export:
+                self.kplot.fig.savefig(export_path+".pdf")
+                self.kplot.fig.savefig(export_path+".png",dpi=300)
 
     def get_redshift(self):
 
@@ -398,7 +405,7 @@ class ModelFits(TabbedPanel):
         popup.open()
 
     #used to save/export the kinematic results, writes a directory which includes two .csv files for the component info
-    #and a sub-folder /fits with the fits files
+    #and a sub-folder /fits with the fits files, and pdf and png files for the plots
     def save_kinematics(self,save_text,selection):
         save_path=str(selection[0])
 
@@ -431,9 +438,40 @@ class ModelFits(TabbedPanel):
         df = pd.DataFrame(export_infos)
         df.to_csv(save_path + '/component_info.csv', index=False)
 
+        #export plots as pdf and png
+
+        #get selector button
+        kinematic_button = self.ids.kinematic_choose
+        flux_button = self.ids.flux_choose
+        tb_button = self.ids.tb_choose
+
+        k_state_initial=kinematic_button.state
+        f_state_initial=flux_button.state
+        t_state_initial=tb_button.state
+
+        kinematic_button.state = 'down'
+        flux_button.state = 'normal'
+        tb_button.state = 'normal'
+        self.update_kinematic_plot(do_export=True,export_path=save_path+"/kinematic_plot")
+
+        kinematic_button.state = 'normal'
+        flux_button.state = 'down'
+        tb_button.state = 'normal'
+        self.update_kinematic_plot(do_export=True, export_path=save_path + "/flux_density_plot")
+
+        kinematic_button.state = 'normal'
+        flux_button.state = 'normal'
+        tb_button.state = 'down'
+        self.update_kinematic_plot(do_export=True, export_path=save_path + "/tb_plot")
+
+        #reset buttons to initial state
+        kinematic_button.state = k_state_initial
+        flux_button.state = f_state_initial
+        tb_button.state = t_state_initial
+        self.update_kinematic_plot()
+
         self.show_popup("Export Info","Export successful to \n" + save_path,"Continue")
 
-        #TODO add option to export the plots as pdf/png as well with a checkbox in the export view
 
     #used to reimport data that was exported with the function above. Needs a directory path
     def import_kinematics(self,directory):

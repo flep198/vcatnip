@@ -230,6 +230,7 @@
                         size_hint_y: 0.1
                         ToggleButton:
                             group:'kinematic_select'
+                            id: kinematic_choose
                             text:"Kinematic"
                             state: "down"
                             on_release:
@@ -238,12 +239,14 @@
                         ToggleButton:
                             group:'kinematic_select'
                             text:"Flux Density"
+                            id: flux_choose
                             on_release:
                                 app.update_kinematic_plot()
                                 self.state='down'
                         ToggleButton:
                             group:'kinematic_select'
                             text:"Brightness Temperature"
+                            id: tb_choose
                             on_release:
                                 app.update_kinematic_plot()
                                 self.state='down'
