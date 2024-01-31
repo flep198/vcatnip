@@ -271,7 +271,7 @@ class ModelFits(TabbedPanel):
         #update kinematics
         self.update_kinematic_plot()
 
-    def set_active_component(self):
+    def set_active_component(self,button=""):
         # find active button
         active_button = next((t for t in ToggleButton.get_widgets('components') if t.state == 'down'), None)
         if active_button:
@@ -498,8 +498,8 @@ class ModelFits(TabbedPanel):
                 if "Component " +str(core_ind) in t.text:
                     t.state="down"
                     self.set_active_component()
+                    self.set_core_component()
                     t.state='normal'
-            self.set_core_component()
             self.set_active_component()
 
 
