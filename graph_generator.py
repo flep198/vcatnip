@@ -50,7 +50,7 @@ class KinematicPlot(object):
 
     def plot_tbs(self,component_collection,color):
         if component_collection.length() > 0:
-            self.ax.scatter(component_collection.year, component_collection.tbs, c=color, label=component_collection.name)
+            self.ax.plot(component_collection.year, component_collection.tbs, c=color, label=component_collection.name,marker=".")
         self.ax.set_xlabel('Time [year]', fontsize=font_size_axis_title)
         self.ax.set_ylabel('Brightness Temperature [K]', fontsize=font_size_axis_title)
         self.ax.set_yscale("log")

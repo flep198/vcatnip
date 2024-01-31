@@ -16,7 +16,6 @@ class Component():
         self.pos = pos
         self.flux = flux
         self.date = date
-        self.mjd = mjd
         self.year = year
         self.component_number = component_number
         self.is_core = is_core
@@ -36,6 +35,13 @@ class Component():
     def assign_component_number(self, number):
         self.component_number = number
 
+    def get_info(self):
+        return {"x": self.x, "y": self.y, "mjd": self.mjd, "maj": self.maj, "min": self.min,
+                "pos": self.pos, "flux": self.flux, "date": self.date,"year": self.year,
+                "component_number": self.component_number, "is_core": self.is_core,
+                "delta_x_est": self.delta_x_est, "delta_y_est": self.delta_y_est,
+                "distance_to_core": self.distance_to_core, "redshift": self.redshift,
+                "freq": self.freq, "tb": self.tb, "scale": self.scale}
 
 class ComponentCollection():
     def __init__(self, components=[], name=""):
@@ -117,6 +123,6 @@ class ComponentCollection():
             t_0_err = 0
             red_chi_sqr = 0
 
-        return {"speed": speed, "speed_err": speed_err, "y0": y0, "y0_err": y0_err,
-                "beta_app": beta_app, "beta_app_err": beta_app_err, "d_crit": d_crit, "d_crit_err": d_crit_err,
+        return {"name": self.name, "speed": float(speed), "speed_err": float(speed_err), "y0": y0, "y0_err": y0_err,
+                "beta_app": float(beta_app), "beta_app_err": float(beta_app_err), "d_crit": float(d_crit), "d_crit_err": float(d_crit_err),
                 "dist_0_est": dist_0_est, "t_0": t_0, "t_0_err": t_0_err, "red_chi_sqr": red_chi_sqr}

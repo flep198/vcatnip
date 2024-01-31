@@ -32,23 +32,63 @@
     BoxLayout:
         orientation: "vertical"
         FileChooser:
-            id: filechooser
-            multiselect: True
-            FileChooserIconLayout
-
+            id: filechooser_save
+            multiselect: False
+            dirselect: True
+            filters: ['']
+            FileChooserIconLayout:
+                on_touch_down: root.load_filepath_to_view(filechooser_save.selection)
 
         BoxLayout:
             size_hint: (1, 0.1)
             pos_hint: {'center_x': .5, 'center_y': .5}
             spacing: 20
+
+            TextInput:
+                id: filename_save
+                height: 30
+                multiline: False
+
             Button:
                 text: "Cancel"
                 on_release: root.dismiss()
             Button:
-                text: "Load"
-                on_release: root.load(filechooser.selection)
-                id: ldbtn
-                disabled: True if filechooser.selection==[] else False
+                text: "Save"
+                on_release:
+                    app.save_kinematics(root.ids.filename_save.text,filechooser_save.selection)
+                    root.dismiss()
+                id: save_button
+                disabled: True if filechooser_save.selection==[] else False
+
+<FileImportPopup>:
+    title: "Import Kinematic Data"
+    size_hint: .9, .9
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "vertical"
+        FileChooser:
+            id: filechooser_save
+            multiselect: False
+            dirselect: True
+            filters: ['']
+            FileChooserIconLayout
+
+        BoxLayout:
+            size_hint: (1, 0.1)
+            pos_hint: {'center_x': .5, 'center_y': .5}
+            spacing: 20
+
+            Button:
+                text: "Cancel"
+                on_release: root.dismiss()
+            Button:
+                text: "Import"
+                on_release:
+                    app.import_kinematics(filechooser_save.selection)
+                    root.dismiss()
+                id: save_button
+                disabled: True if filechooser_save.selection==[] else False
 
 <ModelFits>:
     do_default_tab: False
@@ -128,15 +168,19 @@
                         Button:
                             size_hint_x: 0.2
                             text:"Import Data"
+                            on_release:
+                                root.open_import_dialog()
                         TextInput:
                             size_hint_x: 0.2
                             id: redshift
                             text: "0.00"
                             on_text: app.update_redshift()
+                            multiline: False
                         Button:
                             size_hint_x: 0.4
                             text:"Get Redshift from NED"
                             on_release: app.get_redshift()
+
                     BoxLayout:
                         orientation: "vertical"
                         size_hint_y: 0.7

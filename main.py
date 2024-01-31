@@ -4,17 +4,19 @@ from kivy.uix.togglebutton import ToggleButton
 from kivy.uix.tabbedpanel import TabbedPanel
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
-from kivy.uix.scrollview import ScrollView
 from kivy.properties import ObjectProperty, StringProperty, ListProperty
+from kivy.uix.button import Button
 from graph_widget import MatplotFigure
 from kivy.utils import platform
-from itertools import cycle
-from kinematics import ComponentCollection, Component
+from kinematics import ComponentCollection
 import numpy as np
-from kivy.lang import Builder
 from graph_generator import FitsImage, KinematicPlot
 from astroquery.ipac.ned import Ned
 from astropy.io import fits
+import os
+import pandas as pd
+import glob
+
 
 #avoid conflict between mouse provider and touch (very important with touch device)
 #no need for android platform
@@ -26,7 +28,14 @@ class FileChoosePopup(Popup):
     load = ObjectProperty()
 
 class FileSavePopup(Popup):
-    load = ObjectProperty
+    load = ObjectProperty()
+
+    def load_filepath_to_view(self, selection):
+        if selection!=[]:
+            self.ids.filename_save.text = str(selection[0])
+
+class FileImportPopup(Popup):
+    load = ObjectProperty()
 
 class ModelFits(TabbedPanel):
     file_info = StringProperty("No file chosen")
@@ -40,6 +49,7 @@ class ModelFits(TabbedPanel):
     figure_widgets=[]
     core_component_ind=None
     name=""
+    component_collections = []
 
     def current_color(self,ind):
         if ind is not None:
@@ -56,10 +66,17 @@ class ModelFits(TabbedPanel):
         self.save_dialog = FileSavePopup()
         self.save_dialog.open()
 
+    def open_import_dialog(self):
+        self.import_dialog = FileImportPopup()
+        self.import_dialog.open()
+
     def load(self, selection):
         self.plots=[]
         self.filepaths = selection
-        self.the_popup.dismiss()
+        try:
+            self.the_popup.dismiss()
+        except:
+            pass
         self.file_info=str(len(self.filepaths))+" Files selected"
         self.ids.get_file.text = self.file_info
 
@@ -171,6 +188,9 @@ class ModelFits(TabbedPanel):
 
         self.update_kinematic_plot()
 
+    def load_filepath_to_view(self, selection):
+        if selection!=[]:
+            self.ids.filename_save.text = str(selection[0])
 
     def choose_component(self,figure_widget,x,y):
 
@@ -268,7 +288,7 @@ class ModelFits(TabbedPanel):
         #currently creates a new plot everytime => maybe rewrite to just update existing plot?
         self.kplot=KinematicPlot()
         self.ids.kinematic_plot.figure=self.kplot.fig
-
+        self.component_collections=[]
         self.update_core_dist()
 
         t_max=0
@@ -299,6 +319,7 @@ class ModelFits(TabbedPanel):
                                 flux_max = comp[1].flux
 
                 comp_collection=ComponentCollection(collection,name=self.components[i])
+                self.component_collections.append(comp_collection)
 
                 # find out which plot is currently selected:
                 active_button = next((t for t in ToggleButton.get_widgets('kinematic_select') if t.state == 'down'), None)
@@ -330,9 +351,9 @@ class ModelFits(TabbedPanel):
                             final_row=row
                 try:
                     labels=final_row.children
-                    labels[2].text="{:.2f}".format(float(fit_data["speed"]))+" +/- "+"{:.2f}".format(float(fit_data["speed_err"]))
-                    labels[1].text="{:.2f}".format(float(fit_data["beta_app"]))+" +/- "+"{:.2f}".format(float(fit_data["beta_app_err"]))
-                    labels[0].text="{:.2f}".format(float(fit_data["d_crit"]))+" +/- "+"{:.2f}".format(float(fit_data["d_crit_err"]))
+                    labels[2].text="{:.2f}".format(fit_data["speed"])+" +/- "+"{:.2f}".format(fit_data["speed_err"])
+                    labels[1].text="{:.2f}".format(fit_data["beta_app"])+" +/- "+"{:.2f}".format(fit_data["beta_app_err"])
+                    labels[0].text="{:.2f}".format(fit_data["d_crit"])+" +/- "+"{:.2f}".format(fit_data["d_crit_err"])
                 except:
                     pass
 
@@ -348,7 +369,7 @@ class ModelFits(TabbedPanel):
         except:
             self.redshift = 0.00
 
-        self.ids.redshift.text = str(self.redshift)
+        self.ids.redshift.text = "{:.5f}".format(self.redshift)
         self.update_redshift()
 
     def update_redshift(self):
@@ -365,6 +386,82 @@ class ModelFits(TabbedPanel):
 
         if len(self.components)>0:
             self.update_kinematic_plot()
+
+    def show_popup(self,title,text,button_text):
+        popup = Popup(title=title, auto_dismiss=False, size_hint=(0.35,0.35))
+        box_layout=BoxLayout(orientation="vertical")
+        box_layout.add_widget(Label(text=text,size_hint_y=0.8))
+        close_button=Button(text=button_text,size_hint_y=0.2)
+        close_button.bind(on_press=popup.dismiss)
+        box_layout.add_widget(close_button)
+        popup.add_widget(box_layout)
+        popup.open()
+
+    #used to save/export the kinematic results, writes a directory which includes two .csv files for the component info
+    #and a sub-folder /fits with the fits files
+    def save_kinematics(self,save_text,selection):
+        save_path=str(selection[0])
+
+        #set default file name if name was not specified
+        if save_text==str(selection[0]):
+            save_path=save_path+"/Kinematic_"+"VCAT_export.vcat"
+        else:
+            save_path=save_text
+
+        #create save directories
+        os.makedirs(save_path,exist_ok=True)
+        os.makedirs(save_path+"/fits",exist_ok=True)
+
+        #copy fits files to common directory
+        for file in self.filepaths:
+            os.system("cp " + file + " " + save_path + "/fits/")
+
+        #export Table as seen on the screen with kinematic results
+        export_infos=[]
+        for coll in self.component_collections:
+            export_infos.append(coll.get_speed())
+        df = pd.DataFrame(export_infos)
+        df.to_csv(save_path + '/kinematic_fit.csv',index=False)
+
+        #export Table with component identification
+        export_infos=[]
+        for plot in self.plots:
+            for comp in plot.components:
+                export_infos.append(comp[1].get_info())
+        df = pd.DataFrame(export_infos)
+        df.to_csv(save_path + '/component_info.csv', index=False)
+
+        self.show_popup("Export Info","Export successful to \n" + save_path,"Continue")
+
+        #TODO add option to export the plots as pdf/png as well with a checkbox in the export view
+
+    #used to reimport data that was exported with the function above. Needs a directory path
+    def import_kinematics(self,directory):
+
+        #check if it is a valid vcat kinematics folder
+        if (os.path.isfile(directory[0]+"/component_info.csv") and os.path.isfile(directory[0]+"/kinematic_fit.csv") and
+                os.path.exists(directory[0]+"/fits")):
+
+            #import the fits files
+            selection=glob.glob(directory[0]+"/fits/*")
+            self.load(selection)
+
+            #add components
+            comp_info=pd.read_csv(directory[0]+"/component_info.csv")
+            ncomps=len(np.unique(comp_info[comp_info["component_number"]>=0]["component_number"]))
+            for i in range(ncomps):
+                self.add_component()
+
+            #now identify them with each other
+
+            message="Imported Data successfully."
+
+        else:
+            #throw error message
+            message="Please select a valid .vcat kinematic folder!"
+
+        #create popup for import info
+        self.show_popup("Importing Kinematics",message,"Continue")
 
 
 class VCAT(App):
@@ -409,6 +506,11 @@ class VCAT(App):
     def update_kinematic_plot(self):
         self.screen.update_kinematic_plot()
 
+    def save_kinematics(self,save_text,selection):
+        self.screen.save_kinematics(save_text,selection)
+
+    def import_kinematics(self,directory):
+        self.screen.import_kinematics(directory)
 
 if __name__ == "__main__":
     VCAT().run()
