@@ -271,7 +271,7 @@ class ModelFits(TabbedPanel):
         #update kinematics
         self.update_kinematic_plot()
 
-    def set_active_component(self,button):
+    def set_active_component(self):
         # find active button
         active_button = next((t for t in ToggleButton.get_widgets('components') if t.state == 'down'), None)
         if active_button:
@@ -438,6 +438,8 @@ class ModelFits(TabbedPanel):
     #used to reimport data that was exported with the function above. Needs a directory path
     def import_kinematics(self,directory):
 
+        #TODO reset everything before importing stuff
+
         #check if it is a valid vcat kinematics folder
         if (os.path.isfile(directory[0]+"/component_info.csv") and os.path.isfile(directory[0]+"/kinematic_fit.csv") and
                 os.path.exists(directory[0]+"/fits")):
@@ -452,7 +454,46 @@ class ModelFits(TabbedPanel):
             for i in range(ncomps):
                 self.add_component()
 
+            #set core
+            core_ind=comp_info[comp_info["is_core"]==True]["component_number"].values[0]
+            for t in ToggleButton.get_widgets('components'):
+                if "Component " +str(core_ind) in t.text:
+                    t.state="down"
+                    self.set_active_component()
+                    t.state='normal'
+            self.set_core_component()
+            self.set_active_component()
+
+
             #now identify them with each other
+            for plot in self.plots:
+                for comp in plot.components:
+                    #match plot component with component in list
+                    filter_df=comp_info[(round(comp_info["x"],15)==round(comp[1].x,15))]
+                    ind=filter_df[round(comp_info["y"],15)==round(comp[1].y,15)]["component_number"].values[0]
+
+                    if ind>=0: #only due this if component was assigned
+                        #activate correct button
+                        for t in ToggleButton.get_widgets('components'):
+                            if "Component " + str(ind) in t.text:
+                                t.state='down'
+                                self.set_active_component()
+                                t.state='normal'
+
+                        current_color = self.current_color(self.active_component_ind)
+                        comp[0][0].set_color(current_color)
+                        comp[0][1][0].set_color(current_color)
+                        comp[0][2][0].set_color(current_color)
+                        # assign component to number for kinematics
+                        comp[1].assign_component_number(self.active_component_ind)
+
+                        self.set_active_component()
+
+            self.update_kinematic_plot()
+
+            #set redshift
+            self.ids.redshift.text="{:.5f}".format(comp_info["redshift"].values[0])
+            self.update_kinematic_plot()
 
             message="Imported Data successfully."
 
