@@ -71,7 +71,7 @@ class KinematicPlot(object):
 class FitsImage(object):
     """class that generate Matplotlib graph."""
 
-    def __init__(self,clean_image_file,model_image_file):
+    def __init__(self,clean_image_file,model_image_file=""):
         """Create empty structure plot. 
         
         """       
@@ -107,7 +107,11 @@ class FitsImage(object):
         combined_plot = False  # if True, all epochs will be fitted to one combined pdf file
 
         # Overplot Gaussian-components
-        overplot_gauss = True  # if True all Gaussian components are plotted
+        if model_image_file=="":
+            overplot_gauss = False  # if True all Gaussian components are plotted
+        else:
+            overplot_gauss = True
+
         gauss_linewidth = 0.5  # linewidth of the ellipse
         gauss_color = 'black'  # color of the ellipse
 

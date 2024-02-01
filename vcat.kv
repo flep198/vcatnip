@@ -111,9 +111,26 @@
             Button:
                 text: 'Choose File'
                 size_hint_x: 0.2
-                on_press: root.open_popup()
+                on_press: root.open_popup("modelfit")
             TextInput:
-                id: get_file
+                id: get_file_modelfit
+                readonly: True
+                size_hint_x: 0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: 'Clean Images (.fits files)'
+                size_hint_x: 1
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Button:
+                text: 'Choose File'
+                size_hint_x: 0.2
+                on_press: root.open_popup("clean")
+            TextInput:
+                id: get_file_clean
                 readonly: True
                 size_hint_x: 0.4
             Label:
@@ -126,6 +143,11 @@
         BoxLayout:
             id: main_box
             orientation: 'vertical'
+            Button:
+                text: 'Load Files'
+                size_hint_x: 0.2
+                size_hint_y: 0.05
+                on_release: root.create_kinematic_plots()
             BoxLayout:
                 orientation: 'horizontal'
                 padding: 50
@@ -286,6 +308,10 @@
                     spacing: 50
                     width: self.minimum_width
 
+    TabbedPanelItem:
+        text: 'Stacking'
+        background_color: (1, .5, 0, 1)
+        background_normal: ''
 
 
 

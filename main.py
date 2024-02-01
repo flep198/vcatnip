@@ -41,7 +41,8 @@ class ModelFits(TabbedPanel):
     file_info = StringProperty("No file chosen")
     the_popup = ObjectProperty(None)
     save_dialog = ObjectProperty(None)
-    filepaths = ListProperty([])
+    modelfit_filepaths = ListProperty([])
+    clean_filepaths = ListProperty([])
     plots = []
     components = []
     active_component_ind=None
@@ -58,8 +59,11 @@ class ModelFits(TabbedPanel):
         else:
             return None
 
-    def open_popup(self):
-        self.the_popup = FileChoosePopup(load=self.load)
+    def open_popup(self,type):
+        if type == "modelfit":
+            self.the_popup = FileChoosePopup(load=self.load_modelfit)
+        elif type == "clean":
+            self.the_popup = FileChoosePopup(load=self.load_clean)
         self.the_popup.open()
 
     def open_save_dialog(self):
@@ -71,29 +75,72 @@ class ModelFits(TabbedPanel):
         self.import_dialog.open()
 
 
-    def load(self, selection):
+    def load_modelfit(self, selection):
         self.plots=[]
-        self.filepaths = selection
+        self.modelfit_filepaths = selection
         try:
             self.the_popup.dismiss()
         except:
             pass
-        self.file_info=str(len(self.filepaths))+" Files selected"
-        self.ids.get_file.text = self.file_info
+        self.file_info=str(len(self.modelfit_filepaths))+" Files selected"
+        self.ids.get_file_modelfit.text = self.file_info
 
+    def load_clean(self, selection):
+        self.plots=[]
+        self.clean_filepaths = selection
+        try:
+            self.the_popup.dismiss()
+        except:
+            pass
+        self.file_info=str(len(self.clean_filepaths))+" Files selected"
+        self.ids.get_file_clean.text = self.file_info
+
+    def sort_fits_by_date(self,fits_files):
+        fits_files = np.array(fits_files)
+        if len(fits_files)>0:
+            date=[]
+
+            for filepath in fits_files:
+                plot=FitsImage(filepath)
+                date=np.append(date,plot.get_date(fits.open(filepath)))
+
+            args = date.argsort()
+            fits_files = fits_files[args]
+        return fits_files.tolist()
+
+    def create_kinematic_plots(self):
         #sort files by date
         date=[]
         fits_images=[]
 
-        #create plots for view page
-        for filepath in self.filepaths:
-            plot=FitsImage(filepath,filepath)
-            date=np.append(date,plot.get_date(fits.open(filepath)))
-            fits_images=np.append(fits_images,plot)
+        # sort by date
+        self.modelfit_filepaths = self.sort_fits_by_date(self.modelfit_filepaths)
+        self.clean_filepaths = self.sort_fits_by_date(self.clean_filepaths)
 
-        #sort them according to obsdate
-        args=date.argsort()
-        fits_images=fits_images[args]
+        if len(self.clean_filepaths)!=len(self.modelfit_filepaths) and len(self.clean_filepaths)>0:
+            self.show_popup("Warning","Please use an equal number of modelfit and clean images","Continue")
+            self.modelfit_filepaths=[]
+            self.clean_filepaths=[]
+        elif len(self.clean_filepaths) == 0 and len(self.modelfit_filepaths) == 0:
+            self.show_popup("Warning", "No data selected", "Continue")
+        elif len(self.clean_filepaths) == len(self.modelfit_filepaths):
+            #create plots for view page
+            for ind,filepath in enumerate(self.modelfit_filepaths):
+                plot=FitsImage(self.clean_filepaths[ind],filepath)
+                fits_images=np.append(fits_images,plot)
+            self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
+        elif len(self.clean_filepaths) == 0 and len(self.modelfit_filepaths)>0:
+            # create plots for view page
+            for filepath in self.modelfit_filepaths:
+                plot = FitsImage(filepath, filepath)
+                fits_images = np.append(fits_images, plot)
+            self.show_popup("Warning",
+                            "No clean images imported, using only modelfit images.\n Have fun doing kinematics!",
+                            "Continue")
+        elif len(self.clean_filepaths) > 0 and len(self.modelfit_filepaths) ==0:
+            self.show_popup("Warning","No modelfits imported","Continue")
+
+
 
         for plot in fits_images:
             self.plots.append(plot)
@@ -436,11 +483,15 @@ class ModelFits(TabbedPanel):
 
         #create save directories
         os.makedirs(save_path,exist_ok=True)
-        os.makedirs(save_path+"/fits",exist_ok=True)
+        os.makedirs(save_path+"/modelfit_fits",exist_ok=True)
+        os.makedirs(save_path+"/clean_fits",exist_ok=True)
 
         #copy fits files to common directory
-        for file in self.filepaths:
-            os.system("cp " + file + " " + save_path + "/fits/")
+        for file in self.modelfit_filepaths:
+            os.system("cp " + file + " " + save_path + "/modelfit_fits/")
+
+        for file in self.clean_filepaths:
+            os.system("cp " + file + " " + save_path + "/clean_fits/")
 
         #export Table as seen on the screen with kinematic results
         export_infos=[]
@@ -499,11 +550,14 @@ class ModelFits(TabbedPanel):
 
         #check if it is a valid vcat kinematics folder
         if (os.path.isfile(directory[0]+"/component_info.csv") and os.path.isfile(directory[0]+"/kinematic_fit.csv") and
-                os.path.exists(directory[0]+"/fits")):
+                os.path.exists(directory[0]+"/modelfit_fits") and os.path.exists(directory[0]+"/clean_fits")):
 
             #import the fits files
-            selection=glob.glob(directory[0]+"/fits/*")
-            self.load(selection)
+            selection=glob.glob(directory[0]+"/modelfit_fits/*")
+            self.load_modelfit(selection)
+            selection = glob.glob(directory[0] + "/clean_fits/*")
+            self.load_modelfit(selection)
+            self.create_kinematic_plots()
 
             #add components
             comp_info=pd.read_csv(directory[0]+"/component_info.csv")
