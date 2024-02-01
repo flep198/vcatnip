@@ -8,7 +8,9 @@
         FileChooser:
             id: filechooser
             multiselect: True
+            path: "/home/flep98/Desktop/PhD_Project/"
             FileChooserIconLayout
+
 
 
         BoxLayout:
@@ -131,6 +133,40 @@
                 on_press: root.open_popup("clean")
             TextInput:
                 id: get_file_clean
+                readonly: True
+                size_hint_x: 0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: 'Stokes Q Images (.fits files, if not included in clean .fits)'
+                size_hint_x: 1
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Button:
+                text: 'Choose File'
+                size_hint_x: 0.2
+                on_press: root.open_popup("stokes_q")
+            TextInput:
+                id: get_file_stokes_q
+                readonly: True
+                size_hint_x: 0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: 'Stokes U Images (.fits files, if not included in clean .fits)'
+                size_hint_x: 1
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Button:
+                text: 'Choose File'
+                size_hint_x: 0.2
+                on_press: root.open_popup("stokes_u")
+            TextInput:
+                id: get_file_stokes_u
                 readonly: True
                 size_hint_x: 0.4
             Label:
@@ -312,6 +348,86 @@
         text: 'Stacking'
         background_color: (1, .5, 0, 1)
         background_normal: ''
+        BoxLayout:
+            id: stacking_box
+            orientation: 'vertical'
+            Button:
+                text: 'Load Files'
+                size_hint_x: 0.2
+                size_hint_y: 0.05
+                on_release: root.load_stacking_files()
+            BoxLayout:
+                orientation: 'horizontal'
+                padding: 50
+                BoxLayout:
+                    id: box_top_left_stacking
+                    orientation: 'vertical'
+                    MatplotFigure:
+                        id: stacking_single_plot
+                    BoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: 0.1
+                        Label:
+                            text: "File List"
+                            size_hint_x: 0.9
+                        Label:
+                            text: "Stack?"
+                            size_hint_x: 0.1
+                    ScrollView:
+                        size: self.size
+                        size_hint_y: 0.9
+                        id: scroll_files
+                        GridLayout:
+                            size_hint_y: None
+                            cols: 2
+                            id: stacking_single_list
+                            height: self.minimum_height
+                BoxLayout:
+                    id: box_top_center_stacking
+                    orientation: "vertical"
+                    Label:
+                        text: "Stacking Settings"
+                        size_hint_y:0.1
+                    BoxLayout:
+                        size_hint_y:0.4
+                        GridLayout:
+                            size_hint_y:1
+                            cols:4
+                            CheckBox:
+                                id: do_alignment_check
+                                active: True
+                            Label:
+                                text: "Align Images?"
+                            CheckBox:
+                                id: stack_stokes_check
+                                group: "stack_mode"
+                                active: True
+                            Label:
+                                text: "Stack I,Q,U"
+                            CheckBox:
+                                id: weighted_check
+                            Label:
+                                text: "Weight EVPA stack by lin. pol.?"
+                            CheckBox:
+                                id: stack_pol_check
+                                group: "stack_mode"
+                            Label:
+                                text: "Stack I, lin. Pol, EVPA"
+                    Button:
+                        size_hint_y:0.1
+                        text: "Do Stacking"
+                        on_release: root.stack_images()
+                    BoxLayout:
+                        size_hint_y:0.4
+                BoxLayout
+                    id: box_top_right_stacking
+                    MatplotFigure:
+                        id: stacked_image_i
+                    MatplotFigure:
+                        id: stacked_image_linpol
+                    MatplotFigure:
+                        id: stacked_image_evpa
+
 
 
 

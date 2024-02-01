@@ -6,6 +6,8 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
 from kivy.properties import ObjectProperty, StringProperty, ListProperty
 from kivy.uix.button import Button
+from kivy.uix.checkbox import CheckBox
+from kivy.uix.anchorlayout import AnchorLayout
 from graph_widget import MatplotFigure
 from kivy.utils import platform
 from kinematics import ComponentCollection
@@ -16,6 +18,7 @@ from astropy.io import fits
 import os
 import pandas as pd
 import glob
+from stack_images import stack_fits, stack_pol_fits
 
 
 #avoid conflict between mouse provider and touch (very important with touch device)
@@ -43,6 +46,8 @@ class ModelFits(TabbedPanel):
     save_dialog = ObjectProperty(None)
     modelfit_filepaths = ListProperty([])
     clean_filepaths = ListProperty([])
+    stokes_q_filepaths = ListProperty([])
+    stokes_u_filepaths = ListProperty([])
     plots = []
     components = []
     active_component_ind=None
@@ -52,48 +57,22 @@ class ModelFits(TabbedPanel):
     name=""
     component_collections = []
 
-    def current_color(self,ind):
-        if ind is not None:
-            ind=int(ind % len(self.component_colors))
-            return self.component_colors[ind]
-        else:
-            return None
+    #### STACKING variables
+    stacking_single_plots = []
+    stacking_single_plot_buttons = []
+    stacking_single_plot_checkboxes = []
 
-    def open_popup(self,type):
-        if type == "modelfit":
-            self.the_popup = FileChoosePopup(load=self.load_modelfit)
-        elif type == "clean":
-            self.the_popup = FileChoosePopup(load=self.load_clean)
-        self.the_popup.open()
+    #### GENERAL FUNCTIONS ACROSS TABS
 
-    def open_save_dialog(self):
-        self.save_dialog = FileSavePopup()
-        self.save_dialog.open()
-
-    def open_import_dialog(self):
-        self.import_dialog = FileImportPopup()
-        self.import_dialog.open()
-
-
-    def load_modelfit(self, selection):
-        self.plots=[]
-        self.modelfit_filepaths = selection
-        try:
-            self.the_popup.dismiss()
-        except:
-            pass
-        self.file_info=str(len(self.modelfit_filepaths))+" Files selected"
-        self.ids.get_file_modelfit.text = self.file_info
-
-    def load_clean(self, selection):
-        self.plots=[]
-        self.clean_filepaths = selection
-        try:
-            self.the_popup.dismiss()
-        except:
-            pass
-        self.file_info=str(len(self.clean_filepaths))+" Files selected"
-        self.ids.get_file_clean.text = self.file_info
+    def show_popup(self,title,text,button_text):
+        popup = Popup(title=title, auto_dismiss=False, size_hint=(0.35,0.35))
+        box_layout=BoxLayout(orientation="vertical")
+        box_layout.add_widget(Label(text=text,size_hint_y=0.8))
+        close_button=Button(text=button_text,size_hint_y=0.2)
+        close_button.bind(on_press=popup.dismiss)
+        box_layout.add_widget(close_button)
+        popup.add_widget(box_layout)
+        popup.open()
 
     def sort_fits_by_date(self,fits_files):
         fits_files = np.array(fits_files)
@@ -108,14 +87,84 @@ class ModelFits(TabbedPanel):
             fits_files = fits_files[args]
         return fits_files.tolist()
 
+    #### END OF GENERAL FUNCTIONS USED ACROSS TABS
+
+    #### START OF IMPORT FUNCTIONS
+    def load_modelfit(self, selection):
+        self.plots=[]
+        # sort by date
+        self.modelfit_filepaths = self.sort_fits_by_date(selection)
+        try:
+            self.the_popup.dismiss()
+        except:
+            pass
+        self.file_info=str(len(self.modelfit_filepaths))+" Files selected"
+        self.ids.get_file_modelfit.text = self.file_info
+
+    def load_clean(self, selection):
+        self.plots=[]
+        self.clean_filepaths = self.sort_fits_by_date(selection)
+        try:
+            self.the_popup.dismiss()
+        except:
+            pass
+        self.file_info=str(len(self.clean_filepaths))+" Files selected"
+        self.ids.get_file_clean.text = self.file_info
+
+    def load_stokes_q(self, selection):
+        self.plots=[]
+        self.stokes_q_filepaths = self.sort_fits_by_date(selection)
+        try:
+            self.the_popup.dismiss()
+        except:
+            pass
+        self.file_info=str(len(self.stokes_q_filepaths))+" Files selected"
+        self.ids.get_file_stokes_q.text = self.file_info
+
+    def load_stokes_u(self, selection):
+        self.plots=[]
+        self.stokes_u_filepaths = self.sort_fits_by_date(selection)
+        try:
+            self.the_popup.dismiss()
+        except:
+            pass
+        self.file_info=str(len(self.stokes_u_filepaths))+" Files selected"
+        self.ids.get_file_stokes_u.text = self.file_info
+
+    #### END OF IMPORT FUNCTIONS
+
+    #### START OF KINEMATIC FUNCTIONS
+
+    def open_popup(self,type):
+        if type == "modelfit":
+            self.the_popup = FileChoosePopup(load=self.load_modelfit)
+        elif type == "clean":
+            self.the_popup = FileChoosePopup(load=self.load_clean)
+        elif type == "stokes_q":
+            self.the_popup = FileChoosePopup(load=self.load_stokes_q)
+        elif type == "stokes_u":
+            self.the_popup = FileChoosePopup(load=self.load_stokes_u)
+        self.the_popup.open()
+
+    def open_save_dialog(self):
+        self.save_dialog = FileSavePopup()
+        self.save_dialog.open()
+
+    def open_import_dialog(self):
+        self.import_dialog = FileImportPopup()
+        self.import_dialog.open()
+
+    def current_color(self,ind):
+        if ind is not None:
+            ind=int(ind % len(self.component_colors))
+            return self.component_colors[ind]
+        else:
+            return None
+
     def create_kinematic_plots(self):
         #sort files by date
         date=[]
         fits_images=[]
-
-        # sort by date
-        self.modelfit_filepaths = self.sort_fits_by_date(self.modelfit_filepaths)
-        self.clean_filepaths = self.sort_fits_by_date(self.clean_filepaths)
 
         if len(self.clean_filepaths)!=len(self.modelfit_filepaths) and len(self.clean_filepaths)>0:
             self.show_popup("Warning","Please use an equal number of modelfit and clean images","Continue")
@@ -460,16 +509,6 @@ class ModelFits(TabbedPanel):
         if len(self.components)>0:
             self.update_kinematic_plot()
 
-    def show_popup(self,title,text,button_text):
-        popup = Popup(title=title, auto_dismiss=False, size_hint=(0.35,0.35))
-        box_layout=BoxLayout(orientation="vertical")
-        box_layout.add_widget(Label(text=text,size_hint_y=0.8))
-        close_button=Button(text=button_text,size_hint_y=0.2)
-        close_button.bind(on_press=popup.dismiss)
-        box_layout.add_widget(close_button)
-        popup.add_widget(box_layout)
-        popup.open()
-
     #used to save/export the kinematic results, writes a directory which includes two .csv files for the component info
     #and a sub-folder /fits with the fits files, and pdf and png files for the plots
     def save_kinematics(self,save_text,selection):
@@ -541,7 +580,6 @@ class ModelFits(TabbedPanel):
         self.update_kinematic_plot()
 
         self.show_popup("Export Info","Export successful to \n" + save_path,"Continue")
-
 
     #used to reimport data that was exported with the function above. Needs a directory path
     def import_kinematics(self,directory):
@@ -616,11 +654,83 @@ class ModelFits(TabbedPanel):
         self.show_popup("Importing Kinematics",message,"Continue")
 
 
+    #### END OF KINEMATIC FUNCTIONS
+
+    #### START OF STACKING FUNCTIONS
+
+    def load_stacking_files(self):
+
+        #TODO some basic background checks on the files to see if they are valid and if they exist (write some popups)
+        #TODO also check for polarizations. If there is only Stokes I input, grey out the polarization stacking options
+
+        if (len(self.clean_filepaths)!=len(self.stokes_q_filepaths) or
+            len(self.clean_filepaths)!=len(self.stokes_u_filepaths) or
+            (len(self.stokes_u_filepaths))!=len(self.stokes_q_filepaths)):
+
+            #TODO check if clean files contain polarization info or not!!!
+            self.ids.weighted_check.disabled=True
+            self.ids.stack_pol_check.disabled=True
+            self.ids.stack_stokes_check.disabled=True
+            self.show_popup("Warning","Only doing Stokes I stacking! \n No valid polarization data detected",
+                            "Continue")
+
+        for file in self.clean_filepaths:
+            image=FitsImage(file)
+            self.stacking_single_plots.append(image)
+            button = ToggleButton(
+                text=str(image.get_date(fits.open(file))),
+                size_hint_y=None,
+                size_hint_x=0.9,
+                height=50,
+                group="stacking_single_plots",
+            )
+            button.bind(on_release=self.change_stacking_single_plot)
+
+            #add checkbox
+            checkbox=CheckBox(active=True,size_hint_x=0.1)
+
+            self.stacking_single_plot_checkboxes.append(checkbox)
+            self.stacking_single_plot_buttons.append(button)
+            self.ids.stacking_single_list.add_widget(button)
+            self.ids.stacking_single_list.add_widget(checkbox)
+
+            #select first button by default
+            try:
+                self.stacking_single_plot_buttons[0].state="down"
+                self.change_stacking_single_plot(self.stacking_single_plot_buttons[0])
+            except:
+                pass
+
+
+    #set image input as currently displayed plot
+    def change_stacking_single_plot(self,button=""):
+        ind = np.where(np.array(self.stacking_single_plot_buttons)==button)[0][0]
+        self.ids.stacking_single_plot.figure = self.stacking_single_plots[ind].fig
+
+
+    def stack_images(self):
+
+        #find files to stack
+        files_to_stack=[]
+        for ind,box in enumerate(self.stacking_single_plot_checkboxes):
+            if box.active:
+                files_to_stack.append(self.clean_filepaths[ind])
+        print(files_to_stack)
+        align=self.ids.do_alignment_check.active
+        weighted=self.ids.weighted_check.active
+        if self.ids.stack_stokes_check.active:
+            stack_fits(files_to_stack,align=align)
+        elif self.ids.stack_pol_check.active:
+            stack_pol_fits(files_to_stack,weighted=weighted,align=align)
+
+
 class VCAT(App):
 
     def build(self):
         self.screen=ModelFits()
         return self.screen
+
+    #### START OF KINEMATIC FUNCTIONS
 
     def set_touch_mode(self,touch_mode):
         if touch_mode == "zoombox":
@@ -663,6 +773,10 @@ class VCAT(App):
 
     def import_kinematics(self,directory):
         self.screen.import_kinematics(directory)
+
+    #### END OF KINEMATIC FUNCTIONS
+
+    #### START OF STACKING FUNCTIONS
 
 if __name__ == "__main__":
     VCAT().run()
