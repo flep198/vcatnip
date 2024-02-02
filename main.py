@@ -12,7 +12,7 @@ from graph_widget import MatplotFigure
 from kivy.utils import platform
 from kinematics import ComponentCollection
 import numpy as np
-from graph_generator import FitsImage, KinematicPlot
+from graph_generator import FitsImage, KinematicPlot, get_date
 from astroquery.ipac.ned import Ned
 from astropy.io import fits
 import os
@@ -81,7 +81,7 @@ class ModelFits(TabbedPanel):
 
             for filepath in fits_files:
                 plot=FitsImage(filepath)
-                date=np.append(date,plot.get_date(fits.open(filepath)))
+                date=np.append(date,get_date(filepath))
 
             args = date.argsort()
             fits_files = fits_files[args]
@@ -663,22 +663,23 @@ class ModelFits(TabbedPanel):
         #TODO some basic background checks on the files to see if they are valid and if they exist (write some popups)
         #TODO also check for polarizations. If there is only Stokes I input, grey out the polarization stacking options
 
-        if (len(self.clean_filepaths)!=len(self.stokes_q_filepaths) or
-            len(self.clean_filepaths)!=len(self.stokes_u_filepaths) or
-            (len(self.stokes_u_filepaths))!=len(self.stokes_q_filepaths)):
+        for ind,file in enumerate(self.clean_filepaths):
+            if len(self.stokes_u_filepaths)>ind and len(self.stokes_q_filepaths)>ind:
+                image=FitsImage(file,plot_mode="frac_pol",
+                                stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind])
+            else:
+                image=FitsImage(file,plot_mode="frac_pol")
 
-            #TODO check if clean files contain polarization info or not!!!
-            self.ids.weighted_check.disabled=True
-            self.ids.stack_pol_check.disabled=True
-            self.ids.stack_stokes_check.disabled=True
-            self.show_popup("Warning","Only doing Stokes I stacking! \n No valid polarization data detected",
-                            "Continue")
 
-        for file in self.clean_filepaths:
-            image=FitsImage(file)
+            #check if polarization information was given:
+            if np.sum(image.clean_image.stokes_q)==0 or np.sum(image.clean_image.stokes_u)==0:
+                self.ids.weighted_check.disabled=True
+                self.ids.stack_pol_check.disabled=True
+                self.ids.stack_stokes_check.disabled=True
+
             self.stacking_single_plots.append(image)
             button = ToggleButton(
-                text=str(image.get_date(fits.open(file))),
+                text=str(get_date(file)),
                 size_hint_y=None,
                 size_hint_x=0.9,
                 height=50,
@@ -700,6 +701,11 @@ class ModelFits(TabbedPanel):
                 self.change_stacking_single_plot(self.stacking_single_plot_buttons[0])
             except:
                 pass
+        if self.ids.weighted_check.disabled:
+            self.show_popup("Warning", "Only doing Stokes I stacking! \n No valid polarization data detected",
+                            "Continue")
+        else:
+            self.show_popup("Success","Loaded data including polarization!","Continue")
 
 
     #set image input as currently displayed plot
@@ -715,7 +721,6 @@ class ModelFits(TabbedPanel):
         for ind,box in enumerate(self.stacking_single_plot_checkboxes):
             if box.active:
                 files_to_stack.append(self.clean_filepaths[ind])
-        print(files_to_stack)
         align=self.ids.do_alignment_check.active
         weighted=self.ids.weighted_check.active
         if self.ids.stack_stokes_check.active:

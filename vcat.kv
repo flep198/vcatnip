@@ -421,12 +421,27 @@
                         size_hint_y:0.4
                 BoxLayout
                     id: box_top_right_stacking
+                    orientation: "vertical"
                     MatplotFigure:
-                        id: stacked_image_i
-                    MatplotFigure:
-                        id: stacked_image_linpol
-                    MatplotFigure:
-                        id: stacked_image_evpa
+                        size_hint_y: 0.5
+                        id: stacked_image
+                    BoxLayout:
+                        size_hint_y:0.1
+                        orientation: "horizontal"
+                        ToggleButton:
+                            id: stacked_image_i
+                            text: "Stokes I"
+                            group: "select_stacked_image"
+                        ToggleButton:
+                            id: stacked_image_linpol
+                            text: "Lin. Pol."
+                            group: "select_stacked_image"
+                        ToggleButton:
+                            id: stacked_image_fracpol
+                            text: "Frac. Pol."
+                            group: "select_stacked_image"
+                    BoxLayout:
+                        size_hint_y:0.4
 
 
 
