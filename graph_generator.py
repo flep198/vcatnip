@@ -69,7 +69,8 @@ class KinematicPlot(object):
 
 class ImageData(object):
     def __init__(self,
-                 fits_file,
+                 fits_file="",
+                 stokes_i=[],
                  model="",
                  lin_pol=[],
                  evpa=[],
@@ -78,21 +79,39 @@ class ImageData(object):
                  stokes_u=""):
 
         self.file_path = fits_file
+        self.model_file_path = model
+        self.lin_pol=lin_pol
+        self.evpa=evpa
+        self.stokes_i=stokes_i
+
 
         # Read clean files in
-        hdu_list=fits.open(fits_file)
-        self.hdu_list = hdu_list
+        if fits_file!="":
+            hdu_list=fits.open(fits_file)
+            self.hdu_list = hdu_list
+            self.no_fits=False
+        else:
+            self.no_fits=True
 
         #read stokes data from input files if defined
         if stokes_q != "":
-            stokes_q = fits.open(fits_file)[0].data[0, 0, :, :]
+            try:
+                stokes_q = fits.open(fits_file)[0].data[0, 0, :, :]
+            except:
+                stokes_q=stokes_q
         else:
             stokes_q=[]
 
         if stokes_u != "":
-            stokes_u = fits.open(fits_file)[0].data[0, 0, :, :]
+            try:
+                stokes_u = fits.open(fits_file)[0].data[0, 0, :, :]
+            except:
+                stokes_u = stokes_u
         else:
             stokes_u=[]
+
+        self.stokes_u=stokes_u
+        self.stokes_q=stokes_q
 
         # Set name
         self.name = hdu_list[0].header["OBJECT"]
@@ -132,8 +151,14 @@ class ImageData(object):
 
         self.extent = np.max(self.X), np.min(self.X), np.min(self.Y), np.max(self.Y)
 
-        self.image_data = hdu_list[0].data
-        self.Z = self.image_data[0, 0, :, :]
+        if not self.no_fits:
+            self.image_data = hdu_list[0].data
+            self.Z = self.image_data[0, 0, :, :]
+        else:
+            try:
+                self.Z=self.stokes_i
+            except:
+                pass
 
         #read in polarization input
 
@@ -203,11 +228,10 @@ class FitsImage(object):
     """class that generate Matplotlib graph."""
 
     def __init__(self,
-                 clean_image_file, #path to a .fits file (cleaned/final image)
-                 model_image_file="", #path to a model file (.fits (or .mod to be implemented))
+                 image_data, #ImageData object
                  stokes_i_sigma_cut=3, #sigma_cut for stokes_i_contours
                  plot_mode="stokes_i", #possible modes "stokes_i", "lin_pol", "frac_pol"
-                 im_colormap=True, #Choose whether to do colormap or not
+                 im_colormap=False, #Choose whether to do colormap or not
                  contour=True, #Choose whether to do contour plot or not
                  contour_color = 'grey',  # input: array of color-strings; if None, the contour-colormap (contour_cmap) will be used
                  contour_cmap = None,  # matplotlib colormap string
@@ -215,33 +239,25 @@ class FitsImage(object):
                  contour_width = 0.5,  # contour linewidth
                  im_color='inferno', # string for matplotlib colormap
                  plot_beam=True, #choose whether to plot beam or not
+                 overplot_gauss=False, #choose whether to plot modelfit components
+                 overplot_clean=False, #choose whether to plot clean components
                  ###HERE STARTS POLARIZATION INPUT
-                 lin_pol=[],  # 2d list/array of lin pol data
-                 evpa=[],  # 2d list/array of evpa data
-                 pol_from_stokes=True,
-                 # choose whether to use lin_pol & evpa input (False) OR stokes_q and stokes_u input (TRUE)
-                 stokes_q="",  # filepath to stokes q fits image
-                 stokes_u="", # filepath to stokes u fits image
                  plot_evpa=True, #decide whether to plot EVPA or not
                  evpa_len=6,  # choose length of EVPA in pixels
                  lin_pol_sigma_cut=3,  # choose lowest sigma contour for Lin Pol plot
                  evpa_distance=5,  # choose distance of EVPA vectors to draw in pixels
                  rotate_evpa=0,  # rotate EVPAs by a given angle in degrees (North through East)
                  evpa_color="white", #set EVPA color for plot
+                 title="", #plot title (default is date)
                  rcparams={}  # option to modify matplotlib look
                  ):
 
         super().__init__()
 
         #read image
-        self.clean_image_file=clean_image_file
-        self.clean_image = ImageData(clean_image_file,
-                                     model=model_image_file,
-                                     lin_pol=lin_pol,
-                                     evpa=evpa,
-                                     pol_from_stokes=pol_from_stokes,
-                                     stokes_q=stokes_q,
-                                     stokes_u=stokes_u)
+        self.clean_image = image_data
+        self.clean_image_file = self.clean_image.file_path
+        self.model_image_file = self.clean_image.model_file_path
 
         #set parameters
         self.name = self.clean_image.name
@@ -264,7 +280,6 @@ class FitsImage(object):
         #plot limits
         ra_max,ra_min,dec_min,dec_max=extent
 
-        self.model_image_file=model_image_file
         self.fig, self.ax = plt.subplots(1, 1)
 
         self.components=[]
@@ -277,14 +292,6 @@ class FitsImage(object):
         # Image colormap
         self.im_colormap = im_colormap  # if True, a image colormap will be done
 
-        # Overplot Gaussian-components
-        if model_image_file=="":
-            overplot_gauss = False  # if True all Gaussian components are plotted
-        else:
-            overplot_gauss = True
-
-        # Overplot clean-components
-        overplot_clean = False  # if True all clean components are plotted
         clean_alpha = 1  # float for sympol transparency
 
         #get sigma levs
@@ -338,11 +345,14 @@ class FitsImage(object):
             beam = Ellipse([ell_x, ell_y], beam_maj, beam_min, -beam_pa + 90, fc='grey')
             self.ax.add_artist(beam)
 
-        self.ax.set_title(date, fontsize=font_size_axis_title)
+        if title=="":
+            self.ax.set_title(date, fontsize=font_size_axis_title)
+        else:
+            self.ax.set_title(title, fontsize=font_size_axis_title)
 
         # Read modelfit files in
         if (overplot_gauss == True) or (overplot_clean == True):
-            model_df = getComponentInfo(model_image_file)
+            model_df = getComponentInfo(self.model_image_file)
 
             # sort in gauss and clean components
             model_gauss_df = model_df[model_df["Major_axis"] > 0.].reset_index()

@@ -432,14 +432,23 @@
                             id: stacked_image_i
                             text: "Stokes I"
                             group: "select_stacked_image"
+                            on_release:
+                                root.change_final_stack_plot("stokes_i")
+                                self.state = "down"
                         ToggleButton:
                             id: stacked_image_linpol
                             text: "Lin. Pol."
                             group: "select_stacked_image"
+                            on_release:
+                                root.change_final_stack_plot("lin_pol")
+                                self.state = "down"
                         ToggleButton:
                             id: stacked_image_fracpol
                             text: "Frac. Pol."
                             group: "select_stacked_image"
+                            on_release:
+                                root.change_final_stack_plot("frac_pol")
+                                self.state = "down"
                     BoxLayout:
                         size_hint_y:0.4
 

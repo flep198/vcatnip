@@ -12,7 +12,7 @@ from graph_widget import MatplotFigure
 from kivy.utils import platform
 from kinematics import ComponentCollection
 import numpy as np
-from graph_generator import FitsImage, KinematicPlot, get_date
+from graph_generator import FitsImage, ImageData, KinematicPlot, get_date
 from astroquery.ipac.ned import Ned
 from astropy.io import fits
 import os
@@ -61,6 +61,7 @@ class ModelFits(TabbedPanel):
     stacking_single_plots = []
     stacking_single_plot_buttons = []
     stacking_single_plot_checkboxes = []
+    final_stack_image = ""
 
     #### GENERAL FUNCTIONS ACROSS TABS
 
@@ -80,7 +81,8 @@ class ModelFits(TabbedPanel):
             date=[]
 
             for filepath in fits_files:
-                plot=FitsImage(filepath)
+                plot_data=ImageData(filepath)
+                plot=FitsImage(plot_data)
                 date=np.append(date,get_date(filepath))
 
             args = date.argsort()
@@ -175,13 +177,15 @@ class ModelFits(TabbedPanel):
         elif len(self.clean_filepaths) == len(self.modelfit_filepaths):
             #create plots for view page
             for ind,filepath in enumerate(self.modelfit_filepaths):
-                plot=FitsImage(self.clean_filepaths[ind],filepath)
+                plot_data=ImageData(self.clean_filepaths[ind],filepath)
+                plot=FitsImage(plot_data,overplot_gauss=True)
                 fits_images=np.append(fits_images,plot)
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
         elif len(self.clean_filepaths) == 0 and len(self.modelfit_filepaths)>0:
             # create plots for view page
             for filepath in self.modelfit_filepaths:
-                plot = FitsImage(filepath, filepath)
+                plot_data = ImageData(filepath,filepath)
+                plot = FitsImage(plot_data,overplot_gauss=True)
                 fits_images = np.append(fits_images, plot)
             self.show_popup("Warning",
                             "No clean images imported, using only modelfit images.\n Have fun doing kinematics!",
@@ -665,10 +669,11 @@ class ModelFits(TabbedPanel):
 
         for ind,file in enumerate(self.clean_filepaths):
             if len(self.stokes_u_filepaths)>ind and len(self.stokes_q_filepaths)>ind:
-                image=FitsImage(file,plot_mode="frac_pol",
-                                stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind])
+                plot_data=ImageData(file,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind])
+                image=FitsImage(plot_data,plot_mode="frac_pol")
             else:
-                image=FitsImage(file,plot_mode="frac_pol")
+                plot_data=ImageData(file)
+                image=FitsImage(plot_data,plot_mode="frac_pol")
 
 
             #check if polarization information was given:
@@ -676,6 +681,8 @@ class ModelFits(TabbedPanel):
                 self.ids.weighted_check.disabled=True
                 self.ids.stack_pol_check.disabled=True
                 self.ids.stack_stokes_check.disabled=True
+                self.ids.stacked_image_linpol.disabled=True
+                self.ids.stacked_image_fracpol.disabled=True
 
             self.stacking_single_plots.append(image)
             button = ToggleButton(
@@ -724,9 +731,32 @@ class ModelFits(TabbedPanel):
         align=self.ids.do_alignment_check.active
         weighted=self.ids.weighted_check.active
         if self.ids.stack_stokes_check.active:
-            stack_fits(files_to_stack,align=align)
+            output_stacked = stack_fits(files_to_stack,align=align)
+            stack_image = ImageData(files_to_stack[0],pol_from_stokes=True)
+            stack_image.Z = output_stacked[0][0]
+            if len(output_stacked) > 1: #check for polarization
+                stack_image.stokes_q = output_stacked[1][0]
+                stack_image.stokes_u = output_stacked[2][0]
         elif self.ids.stack_pol_check.active:
-            stack_pol_fits(files_to_stack,weighted=weighted,align=align)
+            output_stacked=stack_pol_fits(files_to_stack,weighted=weighted,align=align)
+            #create new image data with header info from first fits file
+            stack_image = ImageData(files_to_stack[0],pol_from_stokes=False)
+            stack_image.Z = output_stacked[0][0]
+            if len(output_stacked) > 1:  # check for polarization
+                stack_image.lin_pol = output_stacked[1][0]
+                stack_image.evpa = output_stacked[2][0]
+        #create plot
+        self.final_stack_image=stack_image
+        self.ids.stacked_image_i.state="down"
+        StackPlot = FitsImage(stack_image,title="Stacked Image")
+        self.ids.stacked_image.figure = StackPlot.fig
+
+    def change_final_stack_plot(self,mode):
+        if self.final_stack_image!="":
+            StackPlot = FitsImage(self.final_stack_image,plot_mode=mode,title="Stacked Image")
+            self.ids.stacked_image.figure = StackPlot.fig
+
+
 
 
 class VCAT(App):
