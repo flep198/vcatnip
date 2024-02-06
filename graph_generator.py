@@ -156,6 +156,10 @@ class ImageData(object):
             except:
                 pass
 
+        #overwrite fits image data with stokes_i input if given
+        if not stokes_i==[]:
+            self.Z=stokes_i
+
         #read in polarization input
 
         # check if FITS file contains more than just Stokes I
@@ -188,26 +192,38 @@ class ImageData(object):
                 else:
                     self.lin_pol=np.zeros(np.shape(self.Z))
                     self.evpa=np.zeros(np.shape(self.Z))
+            self.image_data[0, 0, :, :] = self.Z
         else:
             pols=3
             dim_wrong=False
             self.stokes_q=hdu_list[0].data[1,0,:,:]
             self.stokes_u=hdu_list[0].data[2,0,:,:]
+            self.image_data[1, 0, :, :] = self.stokes_q
+            self.image_data[2, 0, :, :] = self.stokes_u
 
         if pol_from_stokes and not dim_wrong:
             self.lin_pol = np.sqrt(self.stokes_q ** 2 + self.stokes_u ** 2)
             self.evpa = 0.5 * np.arctan2(self.stokes_u, self.stokes_q)
 
 
+
+
         # Set beam parameters
         try:
+            #DIFMAP style
             self.beam_maj = hdu_list[0].header["BMAJ"] * self.scale
             self.beam_min = hdu_list[0].header["BMIN"] * self.scale
             self.beam_pa = hdu_list[0].header["BPA"]
         except:
-            self.beam_maj = 0
-            self.beam_min = 0
-            self.beam_pa = 0
+            try:
+                #TODO check if this is actually working!
+                #CASA style
+                self.beam_maj, self.beam_min, self.beam_pa, na, nb = hdu_list[1].data[0]
+            except:
+                print("No input beam information!")
+                self.beam_maj = 0
+                self.beam_min = 0
+                self.beam_pa = 0
 
         self.date = get_date(fits_file)
 
@@ -218,11 +234,11 @@ class ImageData(object):
             write_mod_file(self.model, "tmp/mod_files/" + self.date + ".mod", freq=self.freq)
         else:
             self.model=None
-
-            self.model = getComponentInfo(fits_file)
-            write_mod_file(self.model, "tmp/mod_files/" + self.date + ".mod", freq=self.freq)
-
-
+            try:
+                self.model = getComponentInfo(fits_file)
+                write_mod_file(self.model, "tmp/mod_files/" + self.date + ".mod", freq=self.freq)
+            except:
+                pass
         hdu_list.close()
 
 class FitsImage(object):

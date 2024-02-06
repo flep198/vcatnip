@@ -708,7 +708,6 @@ class ModelFits(TabbedPanel):
                 plot_data=ImageData(file,model=model)
                 image=FitsImage(plot_data,plot_mode="frac_pol")
 
-
             #check if polarization information was given:
             if np.sum(image.clean_image.stokes_q)==0 or np.sum(image.clean_image.stokes_u)==0:
                 self.ids.weighted_check.disabled=True
@@ -774,15 +773,17 @@ class ModelFits(TabbedPanel):
                     files_to_stack_q.append(self.stokes_q_filepaths[ind])
                     files_to_stack_u.append(self.stokes_u_filepaths[ind])
                 except:
-                    self.show_popup("Warning","No sufficient polarization info found! \n Only staking Stokes I.",
+                    if len(fits.open(files_to_stack[ind])[0].data)==1:
+                        self.show_popup("Warning","No sufficient polarization info found! \n Only staking Stokes I.",
                                     "Continue")
                 #try importing models and uvf files for beam folding
                 try:
                     files_to_stack_uvf.append(self.uvf_filepaths[ind])
                 except:
-                    do_beam_restore=False
-                    self.show_popup("Warning","No uvf file loaded! \n Cannot restore to common beam",
+                    if do_beam_restore:
+                        self.show_popup("Warning","No uvf file loaded! \n Cannot restore to common beam",
                                     "Continue")
+                        do_beam_restore = False
                 try:
                     files_to_stack_models.append(self.modelfit_filepaths[ind])
                     models_loaded=True
@@ -805,7 +806,7 @@ class ModelFits(TabbedPanel):
                     image=ImageData(files_to_stack[i])
                 mod_file_paths.append("tmp/mod_files/"+image.date+".mod")
 
-            degpp=image.degpp*image.scale #TODO Investigate this since there seems to be an error, test it with MOJAVE data!
+            degpp=image.degpp*image.scale
             npix=len(image.X)
 
             fold_with_beam(files_to_stack, difmap_path=difmap_path, output_dir="tmp/restored_fits", n_pixel=npix*4,
@@ -819,15 +820,17 @@ class ModelFits(TabbedPanel):
         weighted=self.ids.weighted_check.active
         if self.ids.stack_stokes_check.active:
             output_stacked = stack_fits(files_to_stack,align=align,stokes_q_fits=files_to_stack_q,stokes_u_fits=files_to_stack_u)
-            print(output_stacked)
             if len(output_stacked) == 1:
                 stack_image = ImageData(files_to_stack[0],pol_from_stokes=True)
                 stack_image.Z = output_stacked[0][0]
             elif len(output_stacked) > 1: #check for polarization
-                stack_image = ImageData(files_to_stack[0], pol_from_stokes=True,stokes_q=output_stacked[1][0],stokes_u=output_stacked[2][0])
+                stack_image = ImageData(files_to_stack[0], stokes_i=output_stacked[0][0],
+                                        pol_from_stokes=True,stokes_q=output_stacked[1][0],stokes_u=output_stacked[2][0])
                 stack_image.Z = output_stacked[0][0]
                 stack_image.stokes_q = output_stacked[1][0]
                 stack_image.stokes_u = output_stacked[2][0]
+                stack_image.lin_pol = np.sqrt(output_stacked[1][0]**2+output_stacked[2][0]**2)
+                stack_image.evpa=0.5*np.arctan2(output_stacked[2][0],output_stacked[1][0])
 
         elif self.ids.stack_pol_check.active:
             output_stacked=stack_pol_fits(files_to_stack,weighted=weighted,align=align,stokes_u_fits=files_to_stack_u,stokes_q_fits=files_to_stack_q)
