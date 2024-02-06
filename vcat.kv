@@ -105,6 +105,23 @@
             height: 30
             spacing: 5
             Label:
+                text: 'UV-Fits files (.uvf files)'
+                size_hint_x: 1
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Button:
+                text: 'Choose File'
+                size_hint_x: 0.2
+                on_press: root.open_popup("uvf")
+            TextInput:
+                id: get_file_uvf
+                readonly: True
+                size_hint_x: 0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
                 text: 'Modelfit Images (.fits files)'
                 size_hint_x: 1
             Label:
@@ -394,6 +411,12 @@
                             size_hint_y:1
                             cols:4
                             CheckBox:
+                                id: restore_beam_check
+                            Label
+                            Label:
+                                text: "Restore with smallest common beam? (requires DIFMAP)"
+                            Label
+                            CheckBox:
                                 id: do_alignment_check
                                 active: True
                             Label:
@@ -433,22 +456,19 @@
                             text: "Stokes I"
                             group: "select_stacked_image"
                             on_release:
-                                root.change_final_stack_plot("stokes_i")
-                                self.state = "down"
+                                root.change_final_stack_plot("stokes_i",self)
                         ToggleButton:
                             id: stacked_image_linpol
                             text: "Lin. Pol."
                             group: "select_stacked_image"
                             on_release:
-                                root.change_final_stack_plot("lin_pol")
-                                self.state = "down"
+                                root.change_final_stack_plot("lin_pol",self)
                         ToggleButton:
                             id: stacked_image_fracpol
                             text: "Frac. Pol."
                             group: "select_stacked_image"
                             on_release:
-                                root.change_final_stack_plot("frac_pol")
-                                self.state = "down"
+                                root.change_final_stack_plot("frac_pol",self)
                     BoxLayout:
                         size_hint_y:0.4
 

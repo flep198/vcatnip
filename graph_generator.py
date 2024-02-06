@@ -14,6 +14,7 @@ import os
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from kinematics import Component
 from astropy.time import Time
+import sys
 
 #optimized draw on Agg backend
 mpl.rcParams['path.simplify'] = True
@@ -36,7 +37,6 @@ class KinematicPlot(object):
         self.fig, self.ax = plt.subplots(1, 1)
         self.fig.subplots_adjust(left=0.13,top=0.96,right=0.93,bottom=0.2)
 
-
     def plot_kinematics(self,component_collection,color):
         if component_collection.length()>0:
             self.ax.scatter(component_collection.year,component_collection.dist,c=color,marker=".")
@@ -56,8 +56,6 @@ class KinematicPlot(object):
         self.ax.set_ylabel('Brightness Temperature [K]', fontsize=font_size_axis_title)
         self.ax.set_yscale("log")
 
-
-
     def set_limits(self,x,y):
         self.ax.set_xlim(x)
         self.ax.set_ylim(y)
@@ -65,7 +63,6 @@ class KinematicPlot(object):
         def y(x):
             return slope*x+y0
         self.ax.plot([x_min,x_max],[y(x_min),y(x_max)],color,label=label)
-
 
 class ImageData(object):
     def __init__(self,
@@ -83,7 +80,6 @@ class ImageData(object):
         self.lin_pol=lin_pol
         self.evpa=evpa
         self.stokes_i=stokes_i
-
 
         # Read clean files in
         if fits_file!="":
@@ -218,11 +214,16 @@ class ImageData(object):
         if model!="":
             #TODO basic checks if file is valid
             self.model=getComponentInfo(model)
+            #write .mod file from .fits input
+            write_mod_file(self.model, "tmp/mod_files/" + self.date + ".mod", freq=self.freq)
         else:
             self.model=None
 
-        hdu_list.close()
+            self.model = getComponentInfo(fits_file)
+            write_mod_file(self.model, "tmp/mod_files/" + self.date + ".mod", freq=self.freq)
 
+
+        hdu_list.close()
 
 class FitsImage(object):
     """class that generate Matplotlib graph."""
@@ -524,6 +525,7 @@ def getComponentInfo(filename):
     data_df = pd.DataFrame()
     hdu_list = fits.open(filename)
     comp_data = hdu_list[1].data
+    freq=hdu_list[0].header["CRVAL3"]
     comp_data1 = np.zeros((len(comp_data), len(comp_data[0])))
     date = np.array([])
     year = np.array([])
@@ -546,7 +548,64 @@ def getComponentInfo(filename):
         data_df = comp_data1_df
     else:
         data_df = pd.concat([data_df, comp_data1_df], axis=0, ignore_index=True)
+    os.makedirs("tmp",exist_ok=True)
+    os.makedirs("tmp/mod_files",exist_ok=True)
     return data_df
+
+#writes a .mod file given an input of from getComponentInfo(fitsfile)
+def write_mod_file(model_df,writepath,freq,scale=60*60*1000):
+
+    flux = np.array(model_df["Flux"])
+    delta_x = np.array(model_df["Delta_x"])
+    delta_y = np.array(model_df["Delta_y"])
+    maj = np.array(model_df["Major_axis"])
+    min = np.array(model_df["Minor_axis"])
+    pos = np.array(model_df["PA"])
+    typ_obj = np.array(model_df["Typ_obj"])
+
+    original_stdout=sys.stdout
+    sys.stdout=open(writepath,'w')
+
+    radius=[]
+    theta=[]
+    ratio=[]
+
+    for ind in range(len(flux)):
+        radius.append(np.sqrt(delta_x[ind]**2+delta_y[ind]**2)*scale)
+        if (delta_y[ind]>0 and delta_x[ind]>0) or (delta_y[ind]>0 and delta_x[ind]<0):
+            theta.append(np.arctan(delta_x[ind]/delta_y[ind])/np.pi*180)
+        elif delta_y[ind]<0 and delta_x[ind]>0:
+            theta.append(np.arctan(delta_x[ind]/delta_y[ind])/np.pi*180+180)
+        elif delta_y[ind]<0 and delta_x[ind]<0:
+            theta.append(np.arctan(delta_x[ind] / delta_y[ind]) / np.pi * 180 - 180)
+        else:
+            theta.append(0)
+        if maj[ind]>0:
+            ratio.append(min[ind]/maj[ind])
+        else:
+            ratio.append(0)
+
+    #sort by flux
+    argsort=flux.argsort()[::-1]
+    flux=np.array(flux)[argsort]
+    radius=np.array(radius)[argsort]
+    theta=np.array(theta)[argsort]
+    maj=np.array(maj)[argsort]
+    ratio=np.array(ratio)[argsort]
+    pos=np.array(pos)[argsort]
+    typ_obj=np.array(typ_obj)[argsort]
+
+    for ind in range(len(flux)):
+        print(" "+"{:.8f}".format(flux[ind])+"   "+
+              "{:.8f}".format(radius[ind])+"    "+
+              "{:.3f}".format(theta[ind])+"   "+
+              "{:.7f}".format(maj[ind]*scale)+"    "+
+              "{:.6f}".format(ratio[ind])+"   "+
+              "{:.4f}".format(pos[ind])+"  "+
+              str(int(typ_obj[ind]))+" "+
+              "{:.5E}".format(freq)+"   0")
+
+    sys.stdout = original_stdout
 
 def get_date(filename):
 

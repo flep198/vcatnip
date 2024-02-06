@@ -12,13 +12,13 @@ from graph_widget import MatplotFigure
 from kivy.utils import platform
 from kinematics import ComponentCollection
 import numpy as np
-from graph_generator import FitsImage, ImageData, KinematicPlot, get_date
+from graph_generator import FitsImage, ImageData, KinematicPlot, get_date, getComponentInfo
 from astroquery.ipac.ned import Ned
 from astropy.io import fits
 import os
 import pandas as pd
 import glob
-from stack_images import stack_fits, stack_pol_fits
+from stack_images import stack_fits, stack_pol_fits, get_common_beam, fold_with_beam
 
 
 #avoid conflict between mouse provider and touch (very important with touch device)
@@ -48,6 +48,7 @@ class ModelFits(TabbedPanel):
     clean_filepaths = ListProperty([])
     stokes_q_filepaths = ListProperty([])
     stokes_u_filepaths = ListProperty([])
+    uvf_filepaths = ListProperty([])
     plots = []
     components = []
     active_component_ind=None
@@ -89,9 +90,31 @@ class ModelFits(TabbedPanel):
             fits_files = fits_files[args]
         return fits_files.tolist()
 
+    def sort_uvf_by_date(self,uvf_files):
+        uvf_files = np.array(uvf_files)
+        if len(uvf_files) > 0:
+            date = []
+
+            for filepath in uvf_files:
+                date = np.append(date, fits.open(filepath)[0].header["DATE-OBS"])
+            args = date.argsort()
+            uvf_files = uvf_files[args]
+        return uvf_files.tolist()
     #### END OF GENERAL FUNCTIONS USED ACROSS TABS
 
     #### START OF IMPORT FUNCTIONS
+
+    def load_uvf(self,selection):
+        self.plots = []
+        # sort by date
+        self.uvf_filepaths = self.sort_uvf_by_date(selection)
+        try:
+            self.the_popup.dismiss()
+        except:
+            pass
+        self.file_info = str(len(self.uvf_filepaths)) + " Files selected"
+        self.ids.get_file_uvf.text = self.file_info
+
     def load_modelfit(self, selection):
         self.plots=[]
         # sort by date
@@ -140,6 +163,8 @@ class ModelFits(TabbedPanel):
     def open_popup(self,type):
         if type == "modelfit":
             self.the_popup = FileChoosePopup(load=self.load_modelfit)
+        elif type == "uvf":
+            self.the_popup = FileChoosePopup(load=self.load_uvf)
         elif type == "clean":
             self.the_popup = FileChoosePopup(load=self.load_clean)
         elif type == "stokes_q":
@@ -177,14 +202,14 @@ class ModelFits(TabbedPanel):
         elif len(self.clean_filepaths) == len(self.modelfit_filepaths):
             #create plots for view page
             for ind,filepath in enumerate(self.modelfit_filepaths):
-                plot_data=ImageData(self.clean_filepaths[ind],filepath)
+                plot_data=ImageData(self.clean_filepaths[ind],model=filepath)
                 plot=FitsImage(plot_data,overplot_gauss=True)
                 fits_images=np.append(fits_images,plot)
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
         elif len(self.clean_filepaths) == 0 and len(self.modelfit_filepaths)>0:
             # create plots for view page
             for filepath in self.modelfit_filepaths:
-                plot_data = ImageData(filepath,filepath)
+                plot_data = ImageData(filepath,model=filepath)
                 plot = FitsImage(plot_data,overplot_gauss=True)
                 fits_images = np.append(fits_images, plot)
             self.show_popup("Warning",
@@ -526,12 +551,12 @@ class ModelFits(TabbedPanel):
 
         #create save directories
         os.makedirs(save_path,exist_ok=True)
-        os.makedirs(save_path+"/modelfit_fits",exist_ok=True)
+        os.makedirs(save_path+"/modelfit_files",exist_ok=True)
         os.makedirs(save_path+"/clean_fits",exist_ok=True)
 
         #copy fits files to common directory
         for file in self.modelfit_filepaths:
-            os.system("cp " + file + " " + save_path + "/modelfit_fits/")
+            os.system("cp " + file + " " + save_path + "/modelfit_filess/")
 
         for file in self.clean_filepaths:
             os.system("cp " + file + " " + save_path + "/clean_fits/")
@@ -592,10 +617,10 @@ class ModelFits(TabbedPanel):
 
         #check if it is a valid vcat kinematics folder
         if (os.path.isfile(directory[0]+"/component_info.csv") and os.path.isfile(directory[0]+"/kinematic_fit.csv") and
-                os.path.exists(directory[0]+"/modelfit_fits") and os.path.exists(directory[0]+"/clean_fits")):
+                os.path.exists(directory[0]+"/modelfit_files") and os.path.exists(directory[0]+"/clean_fits")):
 
             #import the fits files
-            selection=glob.glob(directory[0]+"/modelfit_fits/*")
+            selection=glob.glob(directory[0]+"/modelfit_files/*")
             self.load_modelfit(selection)
             selection = glob.glob(directory[0] + "/clean_fits/*")
             self.load_modelfit(selection)
@@ -669,10 +694,18 @@ class ModelFits(TabbedPanel):
 
         for ind,file in enumerate(self.clean_filepaths):
             if len(self.stokes_u_filepaths)>ind and len(self.stokes_q_filepaths)>ind:
-                plot_data=ImageData(file,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind])
+                if len(self.modelfit_filepaths)>ind:
+                    model=self.modelfit_filepaths[ind]
+                else:
+                    model=""
+                plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind])
                 image=FitsImage(plot_data,plot_mode="frac_pol")
             else:
-                plot_data=ImageData(file)
+                if len(self.modelfit_filepaths)>ind:
+                    model=self.modelfit_filepaths[ind]
+                else:
+                    model=""
+                plot_data=ImageData(file,model=model)
                 image=FitsImage(plot_data,plot_mode="frac_pol")
 
 
@@ -725,20 +758,79 @@ class ModelFits(TabbedPanel):
 
         #find files to stack
         files_to_stack=[]
+        files_to_stack_q=[]
+        files_to_stack_u=[]
+        files_to_stack_uvf=[]
+        files_to_stack_models=[]
+
+        do_beam_restore = self.ids.restore_beam_check.active
+        models_loaded = False
+
         for ind,box in enumerate(self.stacking_single_plot_checkboxes):
             if box.active:
                 files_to_stack.append(self.clean_filepaths[ind])
+                #try finding polarization
+                try:
+                    files_to_stack_q.append(self.stokes_q_filepaths[ind])
+                    files_to_stack_u.append(self.stokes_u_filepaths[ind])
+                except:
+                    self.show_popup("Warning","No sufficient polarization info found! \n Only staking Stokes I.",
+                                    "Continue")
+                #try importing models and uvf files for beam folding
+                try:
+                    files_to_stack_uvf.append(self.uvf_filepaths[ind])
+                except:
+                    do_beam_restore=False
+                    self.show_popup("Warning","No uvf file loaded! \n Cannot restore to common beam",
+                                    "Continue")
+                try:
+                    files_to_stack_models.append(self.modelfit_filepaths[ind])
+                    models_loaded=True
+                except:
+                    pass
+
+        #check if we need to restore the beam sizes first before proceeding
+        if do_beam_restore:
+            #TODO currently only works for Stokes I!
+            difmap_path = '/'.join(os.popen("which difmap").read().split("/")[:-1])
+            difmap_path = '/usr/local/difmap/uvf_difmap_2.5g' ##TODO fix this, so difmap executable is found automatically!
+            print(difmap_path)
+            print("Hey")
+
+            mod_file_paths=[]
+            for i in range(len(files_to_stack)):
+                if models_loaded:
+                    image=ImageData(files_to_stack[i],model=files_to_stack_models[i])
+                else:
+                    image=ImageData(files_to_stack[i])
+                mod_file_paths.append("tmp/mod_files/"+image.date+".mod")
+
+            degpp=image.degpp*image.scale #TODO Investigate this since there seems to be an error, test it with MOJAVE data!
+            npix=len(image.X)
+
+            fold_with_beam(files_to_stack, difmap_path=difmap_path, output_dir="tmp/restored_fits", n_pixel=npix*4,
+                           pixel_size=degpp/2, use_common_beam=True, mod_files=mod_file_paths,
+                           uvf_files=files_to_stack_uvf)
+
+            for i in range(len(files_to_stack)):
+                files_to_stack[i]="tmp/restored_fits/"+'.'.join(files_to_stack[i].split("/")[-1].split(".")[0:-1])+"_convolved.fits"
+
         align=self.ids.do_alignment_check.active
         weighted=self.ids.weighted_check.active
         if self.ids.stack_stokes_check.active:
-            output_stacked = stack_fits(files_to_stack,align=align)
-            stack_image = ImageData(files_to_stack[0],pol_from_stokes=True)
-            stack_image.Z = output_stacked[0][0]
-            if len(output_stacked) > 1: #check for polarization
+            output_stacked = stack_fits(files_to_stack,align=align,stokes_q_fits=files_to_stack_q,stokes_u_fits=files_to_stack_u)
+            print(output_stacked)
+            if len(output_stacked) == 1:
+                stack_image = ImageData(files_to_stack[0],pol_from_stokes=True)
+                stack_image.Z = output_stacked[0][0]
+            elif len(output_stacked) > 1: #check for polarization
+                stack_image = ImageData(files_to_stack[0], pol_from_stokes=True,stokes_q=output_stacked[1][0],stokes_u=output_stacked[2][0])
+                stack_image.Z = output_stacked[0][0]
                 stack_image.stokes_q = output_stacked[1][0]
                 stack_image.stokes_u = output_stacked[2][0]
+
         elif self.ids.stack_pol_check.active:
-            output_stacked=stack_pol_fits(files_to_stack,weighted=weighted,align=align)
+            output_stacked=stack_pol_fits(files_to_stack,weighted=weighted,align=align,stokes_u_fits=files_to_stack_u,stokes_q_fits=files_to_stack_q)
             #create new image data with header info from first fits file
             stack_image = ImageData(files_to_stack[0],pol_from_stokes=False)
             stack_image.Z = output_stacked[0][0]
@@ -751,10 +843,11 @@ class ModelFits(TabbedPanel):
         StackPlot = FitsImage(stack_image,title="Stacked Image")
         self.ids.stacked_image.figure = StackPlot.fig
 
-    def change_final_stack_plot(self,mode):
+    def change_final_stack_plot(self,mode,button):
         if self.final_stack_image!="":
             StackPlot = FitsImage(self.final_stack_image,plot_mode=mode,title="Stacked Image")
             self.ids.stacked_image.figure = StackPlot.fig
+            button.state="down"
 
 
 

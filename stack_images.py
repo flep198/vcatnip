@@ -433,16 +433,13 @@ def plot_pol_image(stokes_i, #2d list/array of stokes i data
 
 def get_common_beam(fits_files,
         ppe=100, #sample points used per input ellipse
-        plot_beams=True, #makes a simple plot of all the beams for double checking
+        plot_beams=False, #makes a simple plot of all the beams for double checking
         tolerance=0.0001 #adjust the numeric tolarance for determining the common beam
         ):
        
     fig = plt.figure()
     ax = fig.add_subplot()
 
-    bmajs=[]
-    bmins=[]
-    posas=[]
     sample_points=np.empty(shape=(ppe*len(fits_files),2))
         
     for ind,file_path in enumerate(fits_files):
@@ -472,7 +469,6 @@ def get_common_beam(fits_files,
        
     #find out bmaj, bmin and posa
     bmaj_ind=np.argmax(radii)
-    bmin_ind=np.argmin(radii)
     
     if bmaj_ind==0:
         bmaj=2*radii[0]
@@ -482,15 +478,13 @@ def get_common_beam(fits_files,
         bmaj=2*radii[1]
         bmin=2*radii[0]
         posa=-np.arcsin(rotation[1][0])/np.pi*180
-    
-    print(bmaj,bmin,posa)
+
     #make posa from -90 to +90
     if posa>90:
         posa=posa-180
     elif posa<-90:
         posa=posa+180
-    
-    print(bmaj,bmin,posa)
+
     # plot ellipsoid
     if plot_beams:
         from matplotlib import patches
@@ -604,14 +598,13 @@ def fold_with_beam(fits_files, #array of file paths to fits images input
 
         #create output directory
         if not os.path.isdir(output_dir):
-            os.system("mkdir " + output_dir)
+            os.makedirs(output_dir,exist_ok=True)
         
         #add difmap to PATH
         if difmap_path != None and not difmap_path in os.environ['PATH']:
             os.environ['PATH'] = os.environ['PATH'] + ':{0}'.format(difmap_path) 
             
         # Initialize difmap call
-
         child = pexpect.spawn('difmap', encoding='utf-8', echo=False)
         child.expect_exact("0>",None, 2)
 
@@ -621,11 +614,12 @@ def fold_with_beam(fits_files, #array of file paths to fits images input
 
         for ind, fits_file in enumerate(fits_files):
             send_difmap_command("obs " + uvf_files[ind])
+            send_difmap_command("uvw 0,-1") #use natural weighting
             send_difmap_command("select " + channel)
             send_difmap_command("rmod " + mod_files[ind])
             send_difmap_command("maps " + str(n_pixel) + "," + str(pixel_size))
             send_difmap_command("restore " + str(bmaj) + "," + str(bmin) + "," + str(posa))
-            send_difmap_command("save " + output_dir + "/" + fits_file[0:-5]+"_convolved") 
+            send_difmap_command("save " + output_dir + "/" + '.'.join(fits_file.split("/")[-1].split(".")[0:-1])+"_convolved")
         
         os.system("rm -rf difmap.log*")
         
