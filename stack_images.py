@@ -572,7 +572,8 @@ def fold_with_beam(fits_files, #array of file paths to fits images input
         pixel_size=-1, #pixel size in mas (default uses 1/10 of bmin)
         use_common_beam=False, #choose whether to fold with the common beam of the input arrays (TRUE) or whether to use the input bmaj,bmin,posa beam (FALSE, default)  
         mod_files=[], #optional input array of file paths to .mod files for fits_files
-        uvf_files=[] #optional input array of file paths to .uvf files for fits_files
+        uvf_files=[], #optional input array of file paths to .uvf files for fits_files
+        do_selfcal=True
         ):
 
         #check if custom beam is correctly defined when using it
@@ -620,11 +621,13 @@ def fold_with_beam(fits_files, #array of file paths to fits images input
             send_difmap_command("uvw 0,-1") #use natural weighting
             send_difmap_command("select " + channel)
             send_difmap_command("rmod " + mod_files[ind])
+            if do_selfcal:
+                send_difmap_command("selfcal")
             send_difmap_command("maps " + str(n_pixel) + "," + str(pixel_size))
             send_difmap_command("restore " + str(bmaj) + "," + str(bmin) + "," + str(posa))
             send_difmap_command("save " + output_dir + "/" + '.'.join(fits_file.split("/")[-1].split(".")[0:-1])+"_convolved")
         
-        os.system("rm -rf difmap.log*")
+        #os.system("rm -rf difmap.log*")
         
         print("Convolving complete!")
     

@@ -1,0 +1,68 @@
+! Started logfile: difmap.log_8 on Wed Feb  7 17:52:56 2024
+obs /home/flep98/Desktop/0506_pol_final.uvf
+! Reading UV FITS file: /home/flep98/Desktop/0506_pol_final.uvf
+! AN table 1: 102 integrations on 36 of 36 possible baselines.
+! AN table 2: Unused.
+! Apparent sampling: 0.965142 visibilities/baseline/integration-bin.
+! Found source: 0506+056
+! 
+! There are 4 IFs, and a total of 4 channels:
+! 
+!  IF  Channel    Frequency  Freq offset  Number of   Overall IF
+!       origin    at origin  per channel   channels    bandwidth
+!  ------------------------------------------------------------- (Hz)
+!  01        1  1.52721e+10      6.4e+07          1      6.4e+07
+!  02        2  1.53361e+10      6.4e+07          1      6.4e+07
+!  03        3  1.54001e+10      6.4e+07          1      6.4e+07
+!  04        4  1.54641e+10      6.4e+07          1      6.4e+07
+! 
+! Polarization(s): RR LL RL LR
+! 
+! Read 1 lines of history.
+! 
+! Reading 56704 visibilities.
+uvw 0,-1
+! Uniform weighting is not currently selected.
+! Gridding weights will be scaled by errors raised to the power -1.
+! Radial weighting is not currently selected.
+select u
+! Selecting polarization: U,  channels: 1..4
+! Reading IF 1 channels: 1..1
+! Reading IF 2 channels: 2..2
+! Reading IF 3 channels: 3..3
+! Reading IF 4 channels: 4..4
+rmod tmp/mod_files_u/2017-10-19.mod
+! A total of 9 model components were read from file tmp/mod_files_u/2017-10-19.mod
+selfcal
+! Performing phase self-cal
+! Adding 9 model components to the UV plane model.
+! The established model now contains 9 components and 0.00256397 Jy
+! 
+! Correcting IF 1.
+!  A total of 306 telescope corrections were flagged in sub-array 1.
+! 
+! Correcting IF 2.
+!  A total of 307 telescope corrections were flagged in sub-array 1.
+! 
+! Correcting IF 3.
+!  A total of 305 telescope corrections were flagged in sub-array 1.
+! 
+! Correcting IF 4.
+!  A total of 305 telescope corrections were flagged in sub-array 1.
+! 
+! Fit before self-cal, rms=0.020363Jy  sigma=1.458229
+! Fit after  self-cal, rms=0.019688Jy  sigma=1.398630
+maps 4096,0.025000000000002
+! Map grid = 4096x4096 pixels with 0.0250x0.0250 milli-arcsec cellsize.
+restore 2.0304054487496614,0.9507630602456629,-7.991165
+! Inverting map and beam 
+! Estimated beam: bmin=0.9745 mas, bmaj=1.991 mas, bpa=-7.373 degrees
+! Estimated noise=0.101559 mJy/beam.
+! Restoring with beam: 0.9508 x 2.03 at -7.991 degrees (North through East)
+! Clean map  min=-0.0010737  max=0.0080577 Jy/beam
+save tmp/restored_fits_u/0506_final_pol_convolved
+! Writing UV FITS file: tmp/restored_fits_u/0506_final_pol_convolved.uvf
+! Writing 9 model components to file: tmp/restored_fits_u/0506_final_pol_convolved.mod
+! Writing clean map to FITS file: tmp/restored_fits_u/0506_final_pol_convolved.fits
+! Writing difmap environment to: tmp/restored_fits_u/0506_final_pol_convolved.par
+! Log file difmap.log_8 closed on Wed Feb  7 17:52:58 2024
