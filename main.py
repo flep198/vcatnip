@@ -868,7 +868,12 @@ class ModelFits(TabbedPanel):
             npix=len(image.X)
 
             #Restore Stokes I
-            restore_maj,restore_min,restore_pa=get_common_beam(files_to_stack)
+            try:
+                restore_maj=float(self.ids.beam_maj.text)
+                restore_min=float(self.ids.beam_min.text)
+                restore_pa=float(self.ids.beam_pos.text)
+            except:
+                self.show_popup("Error","Please set beam to restore with!","Continue")
 
             fold_with_beam(files_to_stack, difmap_path=difmap_path, bmaj=restore_maj, bmin=restore_min, posa=restore_pa,
                            output_dir="tmp/restored_fits", n_pixel=npix*4,
@@ -939,6 +944,19 @@ class ModelFits(TabbedPanel):
             StackPlot = FitsImage(self.final_stack_image,plot_mode=mode,title="Stacked Image")
             self.ids.stacked_image.figure = StackPlot.fig
             button.state="down"
+
+    def fill_in_common_beam(self):
+        files_to_stack=[]
+        for ind,box in enumerate(self.stacking_single_plot_checkboxes):
+            if box.active:
+                files_to_stack.append(self.clean_filepaths[ind])
+        if len(files_to_stack)>0:
+            maj,min,pos=get_common_beam(files_to_stack)
+            self.ids.beam_maj.text="{:.4f}".format(maj)
+            self.ids.beam_min.text = "{:.4f}".format(min)
+            self.ids.beam_pos.text = "{:.4f}".format(pos)
+        else:
+            self.show_popup("Error","Load stacking files first!","Continue")
 
 
 

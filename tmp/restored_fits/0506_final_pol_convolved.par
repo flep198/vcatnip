@@ -1,4 +1,4 @@
-! Command file created by the difmap on Wed Feb  7 17:52:53 2024
+! Command file created by the difmap on Wed Feb  7 18:31:06 2024
 mapunits mas
 multi_model false
 get tmp/restored_fits/0506_final_pol_convolved

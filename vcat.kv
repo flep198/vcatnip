@@ -429,6 +429,30 @@
                             text:'/usr/local/difmap/uvf_difmap_2.5g'
                             id: difmap_path
                     BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "MAJ"
+                        TextInput:
+                            id: beam_maj
+                            text: ""
+                        Label:
+                            text: "MIN"
+                        TextInput
+                            id: beam_min
+                            text: ""
+                        Label:
+                            text: "POS"
+                        TextInput:
+                            id: beam_pos
+                            text: ""
+                        Button:
+                            size_x_hint: 0.3
+                            text: "Get Common Beam"
+                            on_release: root.fill_in_common_beam()
+                        Label:
+                            text:
+                    BoxLayout:
                         size_hint_y:0.4
                         GridLayout:
                             size_hint_y:1
@@ -437,7 +461,7 @@
                                 id: restore_beam_check
                             Label
                             Label:
-                                text: "Restore with smallest common beam? (requires DIFMAP)"
+                                text: "Restore with beam? (requires DIFMAP)"
                             Label
                             CheckBox:
                                 id: do_alignment_check
@@ -464,7 +488,7 @@
                         text: "Do Stacking"
                         on_release: root.stack_images()
                     BoxLayout:
-                        size_hint_y:0.3
+                        size_hint_y:0.2
                 BoxLayout
                     id: box_top_right_stacking
                     orientation: "vertical"

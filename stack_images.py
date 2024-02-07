@@ -627,11 +627,9 @@ def fold_with_beam(fits_files, #array of file paths to fits images input
             send_difmap_command("restore " + str(bmaj) + "," + str(bmin) + "," + str(posa))
             send_difmap_command("save " + output_dir + "/" + '.'.join(fits_file.split("/")[-1].split(".")[0:-1])+"_convolved")
         
-        #os.system("rm -rf difmap.log*")
+        os.system("rm -rf difmap.log*")
         
-        print("Convolving complete!")
-    
-
+        print("Convolution complete!")
 
 if __name__ == '__main__':
     
