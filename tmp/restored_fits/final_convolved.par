@@ -1,8 +1,8 @@
-! Command file created by the difmap on Tue Feb  6 16:30:43 2024
+! Command file created by the difmap on Wed Feb  7 10:52:20 2024
 mapunits mas
 multi_model false
 get tmp/restored_fits/final_convolved
-mapsize 1024,0.25, 1024,0.25
+mapsize 1024,0.0625, 1024,0.0625
 select I, 1, 4
 uvtaper 0, 0
 uvrange 0, 0

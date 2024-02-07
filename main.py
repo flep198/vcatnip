@@ -19,6 +19,7 @@ import os
 import pandas as pd
 import glob
 from stack_images import stack_fits, stack_pol_fits, get_common_beam, fold_with_beam
+import subprocess
 
 
 #avoid conflict between mouse provider and touch (very important with touch device)
@@ -49,6 +50,7 @@ class ModelFits(TabbedPanel):
     stokes_q_filepaths = ListProperty([])
     stokes_u_filepaths = ListProperty([])
     uvf_filepaths = ListProperty([])
+    casa_clean_model_filepaths = ListProperty([])
     plots = []
     components = []
     active_component_ind=None
@@ -156,6 +158,17 @@ class ModelFits(TabbedPanel):
         self.file_info=str(len(self.stokes_u_filepaths))+" Files selected"
         self.ids.get_file_stokes_u.text = self.file_info
 
+    def load_casa_clean_model(self,selection):
+        self.plots=[]
+        self.casa_clean_model_filepaths = self.sort_fits_by_date(selection)
+        try:
+            self.the_popup.dismiss()
+        except:
+            pass
+        self.file_info = str(len(self.casa_clean_model_filepaths)) + " Files selected"
+        self.ids.get_file_casa_clean_model.text = self.file_info
+
+
     #### END OF IMPORT FUNCTIONS
 
     #### START OF KINEMATIC FUNCTIONS
@@ -171,6 +184,8 @@ class ModelFits(TabbedPanel):
             self.the_popup = FileChoosePopup(load=self.load_stokes_q)
         elif type == "stokes_u":
             self.the_popup = FileChoosePopup(load=self.load_stokes_u)
+        elif type == "casa_clean_model":
+            self.the_popup = FileChoosePopup(load=self.load_casa_clean_model)
         self.the_popup.open()
 
     def open_save_dialog(self):
@@ -701,6 +716,7 @@ class ModelFits(TabbedPanel):
                 plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind])
                 image=FitsImage(plot_data,plot_mode="frac_pol")
             else:
+                #try to load model from clean .fits file
                 if len(self.modelfit_filepaths)>ind:
                     model=self.modelfit_filepaths[ind]
                 else:
@@ -761,9 +777,11 @@ class ModelFits(TabbedPanel):
         files_to_stack_u=[]
         files_to_stack_uvf=[]
         files_to_stack_models=[]
+        files_to_stack_casa_clean_models=[]
 
-        do_beam_restore = self.ids.restore_beam_check.active
+        do_beam_restore = self.ids.restore_beam_check.active #TODO modify this for text beam input and "get custom beam"-button
         models_loaded = False
+        fold_polarization_beams=True
 
         for ind,box in enumerate(self.stacking_single_plot_checkboxes):
             if box.active:
@@ -774,6 +792,7 @@ class ModelFits(TabbedPanel):
                     files_to_stack_u.append(self.stokes_u_filepaths[ind])
                 except:
                     if len(fits.open(files_to_stack[ind])[0].data)==1:
+                        fold_polarization_beams=False
                         self.show_popup("Warning","No sufficient polarization info found! \n Only staking Stokes I.",
                                     "Continue")
                 #try importing models and uvf files for beam folding
@@ -789,16 +808,19 @@ class ModelFits(TabbedPanel):
                     models_loaded=True
                 except:
                     pass
+                #load casa clean models
+                try:
+                    files_to_stack_casa_clean_models.append(self.casa_clean_model_filepaths[ind])
+                except:
+                    pass
 
         #check if we need to restore the beam sizes first before proceeding
         if do_beam_restore:
-            #TODO currently only works for Stokes I!
-            difmap_path = '/'.join(os.popen("which difmap").read().split("/")[:-1])
-            difmap_path = '/usr/local/difmap/uvf_difmap_2.5g' ##TODO fix this, so difmap executable is found automatically!
-            print(difmap_path)
-            print("Hey")
-
+            difmap_path = self.ids.difmap_path.text ##TODO fix this, so difmap executable is found automatically!
             mod_file_paths=[]
+            mod_file_paths_q=[]
+            mod_file_paths_u=[]
+
             for i in range(len(files_to_stack)):
                 if models_loaded:
                     image=ImageData(files_to_stack[i],model=files_to_stack_models[i])
@@ -806,15 +828,81 @@ class ModelFits(TabbedPanel):
                     image=ImageData(files_to_stack[i])
                 mod_file_paths.append("tmp/mod_files/"+image.date+".mod")
 
+            if fold_polarization_beams:
+                try:
+                    #DIFMAP style
+                    for file in files_to_stack_q:
+                        image_q=ImageData(file,model_save_dir="tmp/mod_files_q/")
+                        mod_file_paths_q.append("tmp/mod_files_q/"+image_q.date+".mod")
+                    if len(files_to_stack_q)==0:
+                        raise Exception()
+                except:
+
+                    # TRY to import CASA clean model
+                    try:
+                        for file in files_to_stack_casa_clean_models:
+                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True)
+                            mod_file_paths_q.append("tmp/mod_files_q/"+image_model.date+".mod")
+                    except:
+                        self.show_popup("Error","Stokes Q .fits file does not contain clean model!","Continue")
+                        fold_polarization_beams=False
+
+                try:
+                    #DIFMAP style
+                    for file in files_to_stack_u:
+                        image_u=ImageData(file,model_save_dir="tmp/mod_files_u/")
+                        mod_file_paths_u.append("tmp/mod_files_u/"+image_u.date+".mod")
+                    if len(files_to_stack_u)==0:
+                        raise Exception()
+                except:
+                    try:
+                        # TRY to import CASA clean model
+                        for file in files_to_stack_casa_clean_models:
+                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True)
+                            mod_file_paths_u.append("tmp/mod_files_u/"+image_model.date+".mod")
+                    except:
+                        self.show_popup("Error","Stokes U .fits file does not contain clean model!","Continue")
+                        fold_polarization_beams=False
+
             degpp=image.degpp*image.scale
             npix=len(image.X)
 
-            fold_with_beam(files_to_stack, difmap_path=difmap_path, output_dir="tmp/restored_fits", n_pixel=npix*4,
-                           pixel_size=degpp/2, use_common_beam=True, mod_files=mod_file_paths,
+            #Restore Stokes I
+            restore_maj,restore_min,restore_pa=get_common_beam(files_to_stack)
+
+            fold_with_beam(files_to_stack, difmap_path=difmap_path, bmaj=restore_maj, bmin=restore_min, posa=restore_pa,
+                           output_dir="tmp/restored_fits", n_pixel=npix*4,
+                           pixel_size=degpp/2, mod_files=mod_file_paths,
                            uvf_files=files_to_stack_uvf)
 
+            if fold_polarization_beams:
+                #Restores Stokes Q
+                fold_with_beam(files_to_stack, #input stokes I files here here to use the common beam from Stokes I!
+                               difmap_path=difmap_path, bmaj=restore_maj, bmin=restore_min, posa=restore_pa,
+                               channel="q", output_dir="tmp/restored_fits_q",
+                               n_pixel=npix * 4,
+                               pixel_size=degpp / 2, mod_files=mod_file_paths_q,
+                               uvf_files=files_to_stack_uvf)
+                for i in range(len(files_to_stack)):
+                    files_to_stack_q.append("tmp/restored_fits_q/"+".".join(
+                        files_to_stack[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits")
+
+                #Restore Stokes U
+                fold_with_beam(files_to_stack, #input stokes I files here here to use the common beam from Stokes I!
+                               difmap_path=difmap_path, bmaj=restore_maj, bmin=restore_min, posa=restore_pa,
+                               channel="u", output_dir="tmp/restored_fits_u",
+                               n_pixel=npix * 4,
+                               pixel_size=degpp / 2, use_common_beam=True, mod_files=mod_file_paths_u,
+                               uvf_files=files_to_stack_uvf)
+                for i in range(len(files_to_stack)):
+                    files_to_stack_u.append("tmp/restored_fits_u/"+".".join(
+                        files_to_stack[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits")
+
+            #change file names:
             for i in range(len(files_to_stack)):
                 files_to_stack[i]="tmp/restored_fits/"+'.'.join(files_to_stack[i].split("/")[-1].split(".")[0:-1])+"_convolved.fits"
+
+
 
         align=self.ids.do_alignment_check.active
         weighted=self.ids.weighted_check.active

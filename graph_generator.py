@@ -73,7 +73,9 @@ class ImageData(object):
                  evpa=[],
                  pol_from_stokes=True,
                  stokes_q="",
-                 stokes_u=""):
+                 stokes_u="",
+                 model_save_dir="tmp/mod_files/",
+                 is_casa_model=False):
 
         self.file_path = fits_file
         self.model_file_path = model
@@ -206,8 +208,6 @@ class ImageData(object):
             self.evpa = 0.5 * np.arctan2(self.stokes_u, self.stokes_q)
 
 
-
-
         # Set beam parameters
         try:
             #DIFMAP style
@@ -219,6 +219,8 @@ class ImageData(object):
                 #TODO check if this is actually working!
                 #CASA style
                 self.beam_maj, self.beam_min, self.beam_pa, na, nb = hdu_list[1].data[0]
+                self.beam_maj=self.beam_maj*1000 #convert to mas
+                self.beam_min=self.beam_min*1000 #convert to mas
             except:
                 print("No input beam information!")
                 self.beam_maj = 0
@@ -227,16 +229,27 @@ class ImageData(object):
 
         self.date = get_date(fits_file)
 
+        ##TODO check for "is_casa_model" and if so, import the CASA model!
         if model!="":
             #TODO basic checks if file is valid
             self.model=getComponentInfo(model)
             #write .mod file from .fits input
-            write_mod_file(self.model, "tmp/mod_files/" + self.date + ".mod", freq=self.freq)
+            os.makedirs(model_save_dir,exist_ok=True)
+            write_mod_file(self.model, model_save_dir + self.date + ".mod", freq=self.freq)
+        elif is_casa_model:
+            #TODO basic checks if file is valid
+            os.makedirs(model_save_dir,exist_ok=True)
+            write_mod_file_from_casa(self.file_path,channel="i", export=model_save_dir+"mod_files/"+self.date + ".mod")
+            write_mod_file_from_casa(self.file_path,channel="q", export=model_save_dir+"mod_files_q/"+self.date + ".mod")
+            write_mod_file_from_casa(self.file_path,channel="u", export=model_save_dir+"mod_files_u/"+self.date + ".mod")
+
         else:
             self.model=None
             try:
+                #try to import model which is attached to the main .fits file
                 self.model = getComponentInfo(fits_file)
-                write_mod_file(self.model, "tmp/mod_files/" + self.date + ".mod", freq=self.freq)
+                os.makedirs(model_save_dir, exist_ok=True)
+                write_mod_file(self.model, model_save_dir + self.date + ".mod", freq=self.freq)
             except:
                 pass
         hdu_list.close()
@@ -260,9 +273,9 @@ class FitsImage(object):
                  overplot_clean=False, #choose whether to plot clean components
                  ###HERE STARTS POLARIZATION INPUT
                  plot_evpa=True, #decide whether to plot EVPA or not
-                 evpa_len=6,  # choose length of EVPA in pixels
+                 evpa_len=8,  # choose length of EVPA in pixels
                  lin_pol_sigma_cut=3,  # choose lowest sigma contour for Lin Pol plot
-                 evpa_distance=5,  # choose distance of EVPA vectors to draw in pixels
+                 evpa_distance=10,  # choose distance of EVPA vectors to draw in pixels
                  rotate_evpa=0,  # rotate EVPAs by a given angle in degrees (North through East)
                  evpa_color="white", #set EVPA color for plot
                  title="", #plot title (default is date)
@@ -622,6 +635,44 @@ def write_mod_file(model_df,writepath,freq,scale=60*60*1000):
               "{:.5E}".format(freq)+"   0")
 
     sys.stdout = original_stdout
+
+def write_mod_file_from_casa(file_path,channel="i",export="export.mod"):
+    image_data=ImageData(file_path)
+    if channel=="i":
+        clean_map=image_data.Z
+    elif channel=="q":
+        clean_map=image_data.stokes_q
+    elif channel=="u":
+        clean_map=image_data.stokes_u
+    else:
+        raise Exception("Please enter a valid channel (i,q,u)")
+
+    #read out clean components from pixel map
+    delta_x=[]
+    delta_y=[]
+    flux=[]
+    zeros=[]
+    for i in range(len(image_data.X)):
+        for j in range(len(image_data.Y)):
+            if clean_map[j][i]>0:
+                delta_x.append(image_data.X[i]/image_data.scale)
+                delta_y.append(image_data.Y[j]/image_data.scale)
+                flux.append(clean_map[j][i])
+                zeros.append(0.0)
+
+    #create model_df
+    model_df=pd.DataFrame(
+        {'Flux': flux,
+         'Delta_x': delta_x,
+         'Delta_y': delta_y,
+         'Major_axis': zeros,
+         'Minor_axis': zeros,
+         'PA': zeros,
+         'Typ_obj': zeros
+         })
+
+    #create mod file
+    write_mod_file(model_df,export,image_data.freq,image_data.scale)
 
 def get_date(filename):
 

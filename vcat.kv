@@ -11,8 +11,6 @@
             path: "/home/flep98/Desktop/PhD_Project/"
             FileChooserIconLayout
 
-
-
         BoxLayout:
             size_hint: (1, 0.1)
             pos_hint: {'center_x': .5, 'center_y': .5}
@@ -184,6 +182,23 @@
                 on_press: root.open_popup("stokes_u")
             TextInput:
                 id: get_file_stokes_u
+                readonly: True
+                size_hint_x: 0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: 'CASA CLEAN model (.fits file from exportfits("file.model"))'
+                size_hint_x: 1
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Button:
+                text: 'Choose File'
+                size_hint_x: 0.2
+                on_press: root.open_popup("casa_clean_model")
+            TextInput:
+                id: get_file_casa_clean_model
                 readonly: True
                 size_hint_x: 0.4
             Label:
@@ -406,6 +421,14 @@
                         text: "Stacking Settings"
                         size_hint_y:0.1
                     BoxLayout:
+                        size_hint_y:0.1
+                        orientation: "horizontal"
+                        Label:
+                            text: "DIFMAP location"
+                        TextInput:
+                            text:'/usr/local/difmap/uvf_difmap_2.5g'
+                            id: difmap_path
+                    BoxLayout:
                         size_hint_y:0.4
                         GridLayout:
                             size_hint_y:1
@@ -441,7 +464,7 @@
                         text: "Do Stacking"
                         on_release: root.stack_images()
                     BoxLayout:
-                        size_hint_y:0.4
+                        size_hint_y:0.3
                 BoxLayout
                     id: box_top_right_stacking
                     orientation: "vertical"

@@ -11,6 +11,7 @@ import pexpect
 from pexpect import replwrap  
 import os
 from numpy import linalg
+from graph_generator import ImageData
 
 def stack_images(image_array, #input images to be stacked
         weighted=False, #choose whether to use the weighted option
@@ -441,13 +442,15 @@ def get_common_beam(fits_files,
     ax = fig.add_subplot()
 
     sample_points=np.empty(shape=(ppe*len(fits_files),2))
-        
     for ind,file_path in enumerate(fits_files):
-        file=fits.open(file_path)
-        bmaj = float(file[0].header["BMAJ"]*60*60*1000)
-        bmin = float(file[0].header["BMIN"]*60*60*1000)
-        posa = float(file[0].header["BPA"])/180*np.pi
-               
+        image_data=ImageData(file_path)
+        bmaj = image_data.beam_maj
+        bmin = image_data.beam_min
+        posa = image_data.beam_pa
+
+        if len(fits_files)==1:
+            return bmaj,bmin,posa
+
         #sample ellipse points
         
         ellipse_angles=np.linspace(0,2*np.pi,ppe)
@@ -573,7 +576,7 @@ def fold_with_beam(fits_files, #array of file paths to fits images input
         ):
 
         #check if custom beam is correctly defined when using it
-        if not use_common_beam and (bmaj<0 or bmin<0 or posa<0):
+        if not use_common_beam and (bmaj<0 or bmin<0):
             raise Exception("Please define a sensible custom beam using 'bmaj', 'bmin' and 'posa' kwargs or select choose use_common_beam=True to use the common beam.")
         elif use_common_beam:
             bmaj,bmin,posa=get_common_beam(fits_files) 
