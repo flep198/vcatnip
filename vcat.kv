@@ -429,29 +429,37 @@
                             text:'/usr/local/difmap/uvf_difmap_2.5g'
                             id: difmap_path
                     BoxLayout:
+                        size_hint_y:0.05
+                    BoxLayout:
                         orientation: 'horizontal'
-                        size_hint_y: 0.1
+                        size_hint_y: 0.05
                         Label:
+                            size_hint_x: 0.1
                             text: "MAJ"
                         TextInput:
+                            size_hint_x: 0.1
                             id: beam_maj
                             text: ""
                         Label:
+                            size_hint_x: 0.1
                             text: "MIN"
                         TextInput
+                            size_hint_x: 0.1
                             id: beam_min
                             text: ""
                         Label:
+                            size_hint_x: 0.1
                             text: "POS"
                         TextInput:
+                            size_hint_x: 0.1
                             id: beam_pos
                             text: ""
                         Button:
-                            size_x_hint: 0.3
+                            size_hint_x: 0.3
                             text: "Get Common Beam"
                             on_release: root.fill_in_common_beam()
-                        Label:
-                            text:
+                    BoxLayout:
+                        size_hint_y:0.05
                     BoxLayout:
                         size_hint_y:0.4
                         GridLayout:
