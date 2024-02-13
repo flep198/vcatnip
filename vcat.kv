@@ -421,7 +421,7 @@
                         text: "Stacking Settings"
                         size_hint_y:0.1
                     BoxLayout:
-                        size_hint_y:0.1
+                        size_hint_y:0.05
                         orientation: "horizontal"
                         Label:
                             text: "DIFMAP location"
@@ -526,6 +526,175 @@
                                 root.change_final_stack_plot("frac_pol",self)
                     BoxLayout:
                         size_hint_y:0.4
+    TabbedPanelItem:
+        text: 'Plotting'
+        background_color: (1, .5, 0, 1)
+        background_normal: ''
+        BoxLayout:
+            id: plotting_box
+            orientation: 'vertical'
+            Button:
+                text: 'Load Files'
+                size_hint_x: 0.2
+                size_hint_y: 0.05
+                on_release: root.load_plotting_files()
+            BoxLayout:
+                orientation:'horizontal'
+                size_hint_y: 0.55
+                BoxLayout:
+                    id: box_top_left_plotting
+                    padding: 20
+                    orientation: 'vertical'
+                    size_hint_x: 0.3
+                    BoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: 0.1
+                        Label:
+                            text: "File List"
+                            size_hint_x: 0.9
+                        Label:
+                            text: "Export?"
+                            size_hint_x: 0.1
+                    ScrollView:
+                        size: self.size
+                        size_hint_y: 0.9
+                        id: scroll_plotting_files
+                        GridLayout:
+                            size_hint_y: None
+                            cols: 2
+                            id: plotting_single_list
+                            height: self.minimum_height
+                BoxLayout:
+                    id: box_top_center_plotting
+                    padding: 20
+                    orientation: 'vertical'
+                    size_hint_x: 0.4
+                    MatplotFigure:
+                        id: plotting_single_plot
+                BoxLayout:
+                    id: box_top_right_plotting
+                    padding: 20
+                    orientation: 'vertical'
+                    size_hint_x: 0.3
+                    BoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: 0.1
+                        Label:
+                            text: "File Info"
+                            size_hint_x: 1
+                    GridLayout:
+                        padding: 10
+                        size_hint_y: 0.9
+                        cols: 2
+                        height: self.minimum_height
+                        Label:
+                            text: "Source Name:"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: source_name
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Frequency:"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: frequency
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Obs Date:"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: obs_date
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Integrated Flux (total image):"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: integrated_flux_image
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Integrated Flux (cleaned):"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: integrated_flux_clean
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Peak Flux:"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: peak_flux
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Stokes I Noise:"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: stokes_i_noise
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Integrated Pol Flux (total image):"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: integrated_pol_flux_image
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Integrated Pol Flux (cleaned):"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: integrated_pol_flux_clean
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Pol Peak Flux:"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: pol_peak_flux
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Pol Noise:"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: pol_noise
+                            size_hint_x: 0.4
+                        Label:
+                            text: "Fractional Polarization:"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: fractional_polarization
+                            size_hint_x: 0.4
+                        Label:
+                            text: "EVPA:"
+                            size_hint_x: 0.6
+                        Label:
+                            text: ""
+                            halign: "left"
+                            id: evpa
+                            size_hint_x: 0.4
+            BoxLayout:
+                size_hint_y: 0.4
+
+
 
 
 

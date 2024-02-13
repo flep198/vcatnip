@@ -66,6 +66,11 @@ class ModelFits(TabbedPanel):
     stacking_single_plot_checkboxes = []
     final_stack_image = ""
 
+    #### PLOTTING variables
+    plotting_single_plots = []
+    plotting_single_plot_buttons = []
+    plotting_single_plot_checkboxes = []
+
     #### GENERAL FUNCTIONS ACROSS TABS
 
     def show_popup(self,title,text,button_text):
@@ -958,6 +963,80 @@ class ModelFits(TabbedPanel):
         else:
             self.show_popup("Error","Load stacking files first!","Continue")
 
+    ### BEGIN PLOT VIEW
+
+    def load_plotting_files(self):
+
+        for ind,clean_file in enumerate(self.clean_filepaths):
+
+            clean_path=self.clean_filepaths[ind]
+
+            try:
+                model_path=self.modelfit_filepaths[ind]
+            except:
+                model_path=""
+            try:
+                stokes_u_path=self.stokes_u_filepaths[ind]
+            except:
+                stokes_u_path= ""
+            try:
+                stokes_q_path = self.stokes_u_filepaths[ind]
+            except:
+                stokes_q_path = ""
+
+            try:
+                plot_data=ImageData(clean_file,
+                                model=self.casa_clean_model_filepaths[ind],
+                                stokes_q=self.stokes_q_filepaths[ind],
+                                stokes_u=self.stokes_u_filepaths[ind],
+                                is_casa_model=True)
+            except:
+                plot_data=ImageData(clean_file,
+                                model=model_path,
+                                stokes_q=stokes_q_path,
+                                stokes_u=stokes_u_path)
+
+            plot=FitsImage(plot_data)
+            self.plotting_single_plots.append(plot)
+
+            button = ToggleButton(
+                text=str(plot_data.date),
+                size_hint_y=None,
+                size_hint_x=0.9,
+                height=50,
+                group="plotting_single_plots",
+            )
+            button.bind(on_release=self.change_plotting_single_plot)
+
+            # add checkbox
+            checkbox = CheckBox(active=True, size_hint_x=0.1)
+
+            self.plotting_single_plot_checkboxes.append(checkbox)
+            self.plotting_single_plot_buttons.append(button)
+            self.ids.plotting_single_list.add_widget(button)
+            self.ids.plotting_single_list.add_widget(checkbox)
+
+    def change_plotting_single_plot(self,button=""):
+        ind = np.where(np.array(self.plotting_single_plot_buttons)==button)[0][0]
+        self.ids.plotting_single_plot.figure = self.plotting_single_plots[ind].fig
+
+        #Update Source information on right side
+        image=self.plotting_single_plots[ind].clean_image
+        self.ids.source_name.text = str(image.name)
+        self.ids.frequency.text = "{:.2f}".format(image.freq*1e-9) + " GHz"
+        self.ids.obs_date.text = str(image.date)
+        self.ids.integrated_flux_image.text = "{:.2f}".format(image.integrated_flux_image*1000) +  " mJy"
+        self.ids.integrated_flux_clean.text = "{:.2f}".format(image.integrated_flux_clean*1000) +  " mJy"
+        self.ids.peak_flux.text = "{:.2f}".format(np.max(image.Z*1000)) + " mJy/beam"
+        self.ids.integrated_pol_flux_image.text = "{:.2f}".format(image.integrated_pol_flux_image * 1000) + " mJy"
+        self.ids.integrated_pol_flux_clean.text = "{:.2f}".format(image.integrated_pol_flux_clean * 1000) + " mJy"
+        self.ids.pol_peak_flux.text = "{:.2f}".format(np.max(image.lin_pol * 1000)) + " mJy/beam"
+        self.ids.stokes_i_noise.text = "{:.2f}".format(image.noise*1000) + " mJy/beam"
+        self.ids.pol_noise.text = "{:.2f}".format(image.pol_noise*1000) + " mJy/beam"
+        self.ids.evpa.text = "{:.2f}".format(image.evpa_average/np.pi*180) + "°"
+        """
+        self.fractional_polarization.text =
+        """
 
 
 

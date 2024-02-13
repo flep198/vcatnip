@@ -1,12 +1,10 @@
 import matplotlib as mpl
-import matplotlib.pyplot as plt
 from kivy.metrics import dp
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 from matplotlib.collections import LineCollection
-from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.colors as colors
 from astropy.io import fits
 from astropy.modeling import models, fitting
@@ -229,30 +227,89 @@ class ImageData(object):
 
         self.date = get_date(fits_file)
 
+
+        #calculate image noise
+        unused, levs_i = get_sigma_levs(self.Z, 1) #get noise for stokes i
+        try:
+            unused, levs_pol = get_sigma_levs(self.lin_pol, 1) #get noise for polarization
+        except:
+            levs_pol=[0]
+
+        # calculate image noise
+        unused, levs_i_3sigma = get_sigma_levs(self.Z, 3)  # get noise for stokes i
+        try:
+            unused, levs_pol_3sigma = get_sigma_levs(self.lin_pol, 3)  # get noise for polarization
+        except:
+            levs_pol = [0]
+
+        self.noise = levs_i[0]
+        self.pol_noise = levs_pol[0]
+
+        self.noise_3sigma  = levs_i_3sigma[0]
+        self.pol_noise_3sigma = levs_pol_3sigma[0]
+
+        #calculate integrated total flux in image
+        self.integrated_flux_image = JyPerBeam2Jy(np.sum(self.Z), self.beam_maj, self.beam_min, self.degpp * self.scale)
+
+        #calculate integrated pol flux in image
+        self.integrated_pol_flux_image = JyPerBeam2Jy(np.sum(self.lin_pol),self.beam_maj,self.beam_min,self.degpp*self.scale)
+
+        #calculate average EVPA (mask where lin pol < 3 sigma or stokes i < 3 sigma (same as in plot)
+        integrate_evpa = np.ma.masked_where((self.lin_pol < self.pol_noise_3sigma) | (self.Z < self.noise_3sigma),
+                                            self.evpa)
+        self.evpa_average = np.average(integrate_evpa)
+
+
         ##TODO check for "is_casa_model" and if so, import the CASA model!
-        if model!="":
+        if model!="" and not is_casa_model:
             #TODO basic checks if file is valid
             self.model=getComponentInfo(model)
             #write .mod file from .fits input
             os.makedirs(model_save_dir,exist_ok=True)
             write_mod_file(self.model, model_save_dir + self.date + ".mod", freq=self.freq)
-        elif is_casa_model:
+        elif model!="" and is_casa_model:
             #TODO basic checks if file is valid
             os.makedirs(model_save_dir,exist_ok=True)
+            os.makedirs(model_save_dir+"mod_files_clean", exist_ok=True)
+            os.makedirs(model_save_dir+"mod_files_q", exist_ok=True)
+            os.makedirs(model_save_dir + "mod_files_u", exist_ok=True)
             write_mod_file_from_casa(self.file_path,channel="i", export=model_save_dir+"mod_files/"+self.date + ".mod")
+            write_mod_file_from_casa(self.file_path,channel="i", export=model_save_dir+"mod_files_clean/"+self.date + ".mod")
             write_mod_file_from_casa(self.file_path,channel="q", export=model_save_dir+"mod_files_q/"+self.date + ".mod")
             write_mod_file_from_casa(self.file_path,channel="u", export=model_save_dir+"mod_files_u/"+self.date + ".mod")
 
         else:
             self.model=None
-            try:
-                #try to import model which is attached to the main .fits file
-                self.model = getComponentInfo(fits_file)
-                os.makedirs(model_save_dir, exist_ok=True)
-                write_mod_file(self.model, model_save_dir + self.date + ".mod", freq=self.freq)
-            except:
-                pass
+        try:
+            os.makedirs("tmp/mod_files_clean", exist_ok=True)
+            os.makedirs("tmp/mod_files_q", exist_ok=True)
+            os.makedirs("tmp/mod_files_u", exist_ok=True)
+            #try to import model which is attached to the main .fits file
+            model_i = getComponentInfo(fits_file)
+            if self.model==None:
+                self.model = model_i
+            write_mod_file(model_i, "tmp/mod_files_clean/"+ self.date + ".mod", freq=self.freq)
+            #load stokes q and u clean models
+            model_q=getComponentInfo(stokes_q)
+            write_mod_file(model_q, "tmp/mod_files_q/" + self.date + ".mod", freq=self.freq)
+            model_u=getComponentInfo(stokes_u)
+            write_mod_file(model_u, "tmp/mod_files_u/" + self.date + ".mod", freq=self.freq)
+        except:
+            pass
+
         hdu_list.close()
+
+        #calculate cleaned flux density from mod files
+        #first stokes I
+        try:
+            self.integrated_flux_clean=total_flux_from_mod("tmp/mod_files_clean/" + self.date + ".mod")
+            flux_q=total_flux_from_mod("tmp/mod_files_q/" + self.date + ".mod")
+            flux_u=total_flux_from_mod("tmp/mod_files_u/" + self.date + ".mod")
+            self.integrated_pol_flux_clean=np.sqrt(flux_u**2+flux_q**2)
+        except:
+            self.integrated_flux_clean=0
+            self.integrated_pol_flux_clean=0
+
 
 class FitsImage(object):
     """class that generate Matplotlib graph."""
@@ -270,16 +327,19 @@ class FitsImage(object):
                  im_color='inferno', # string for matplotlib colormap
                  plot_beam=True, #choose whether to plot beam or not
                  overplot_gauss=False, #choose whether to plot modelfit components
+                 component_color="black", # choose component color for Gauss component
                  overplot_clean=False, #choose whether to plot clean components
+                 xlim=[], #xplot limits, e.g. [5,-5]
+                 ylim=[], #yplot limits
                  ###HERE STARTS POLARIZATION INPUT
                  plot_evpa=True, #decide whether to plot EVPA or not
                  evpa_len=8,  # choose length of EVPA in pixels
                  lin_pol_sigma_cut=3,  # choose lowest sigma contour for Lin Pol plot
                  evpa_distance=10,  # choose distance of EVPA vectors to draw in pixels
-                 rotate_evpa=0,  # rotate EVPAs by a given angle in degrees (North through East)
-                 evpa_color="white", #set EVPA color for plot
-                 title="", #plot title (default is date)
-                 rcparams={}  # option to modify matplotlib look
+                 rotate_evpa=0, # rotate EVPAs by a given angle in degrees (North through East)
+                 evpa_color="white", # set EVPA color for plot
+                 title="", # plot title (default is date)
+                 rcparams={} # option to modify matplotlib look
                  ):
 
         super().__init__()
@@ -310,12 +370,17 @@ class FitsImage(object):
         #plot limits
         ra_max,ra_min,dec_min,dec_max=extent
 
+        if len(xlim) == 2:
+            ra_max, ra_min = xlim
+        if len(ylim) == 2:
+            dec_min, dec_max = ylim
+
         self.fig, self.ax = plt.subplots(1, 1)
 
         self.components=[]
 
         #component default color
-        self.component_color = "black"
+        self.component_color = component_color
 
         fit_noise = True  # if True, the noise value and rms deviation will be fitted as described in the PhD-thesis of Moritz Böck (https://www.physik.uni-wuerzburg.de/fileadmin/11030400/Dissertation_Boeck.pdf); if False, the noise frome difmap will be used
 
@@ -344,7 +409,7 @@ class FitsImage(object):
                 plot_lin_pol = np.array(self.clean_image.lin_pol)
                 plot_frac_pol = plot_lin_pol / np.array(self.clean_image.Z)
                 plot_frac_pol = np.ma.masked_where((plot_lin_pol < levs1_linpol[0]) | (self.clean_image.Z<levs1[0]),
-                                                  plot_frac_pol)  # Check if this is actually the right thing to do
+                                                  plot_frac_pol)
 
                 self.plotColormap(plot_frac_pol,im_color,np.zeros(100),[0.01],extent,
                                   label="Fractional Linear Polarization")
@@ -434,6 +499,7 @@ class FitsImage(object):
         self.ax.invert_xaxis()
         self.ax.set_xlabel('Relative R.A. [' + unit + ']',fontsize=font_size_axis_title)
         self.ax.set_ylabel('Relative DEC. [' + unit + ']',fontsize=font_size_axis_title)
+        mpl.rcParams.update(rcparams)
         self.fig.tight_layout()
 
     def plotColormap(self,
@@ -701,4 +767,22 @@ def get_date(filename):
             year = time[2]
         date = year + "-" + month + "-" + day
     return date
+
+#needs a mod_file as input an returns the total flux
+def total_flux_from_mod(mod_file):
+    lines=open(mod_file).readlines()
+    total_flux=0
+    for line in lines:
+        if not line.startswith("!"):
+            linepart=line.split()
+            total_flux+=float(linepart[0])
+    return total_flux
                 
+def PXPERBEAM(b_maj,b_min,px_inc):
+    beam_area = np.pi/(4*np.log(2))*b_min*b_maj
+    PXPERBEAM = beam_area/(px_inc**2)
+    return PXPERBEAM
+#
+
+def JyPerBeam2Jy(jpb,b_maj,b_min,px_inc):
+    return jpb/PXPERBEAM(b_maj,b_min,px_inc)
