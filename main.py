@@ -984,13 +984,14 @@ class ModelFits(TabbedPanel):
             except:
                 stokes_q_path = ""
 
-            try:
+            try:#CASA STYLE
                 plot_data=ImageData(clean_file,
                                 model=self.casa_clean_model_filepaths[ind],
-                                stokes_q=self.stokes_q_filepaths[ind],
-                                stokes_u=self.stokes_u_filepaths[ind],
+                                stokes_q=stokes_q_path,
+                                stokes_u=stokes_u_path,
+                                model_save_dir="tmp/",
                                 is_casa_model=True)
-            except:
+            except:#DIFMAP STYLE
                 plot_data=ImageData(clean_file,
                                 model=model_path,
                                 stokes_q=stokes_q_path,

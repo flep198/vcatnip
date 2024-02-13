@@ -240,7 +240,7 @@ class ImageData(object):
         try:
             unused, levs_pol_3sigma = get_sigma_levs(self.lin_pol, 3)  # get noise for polarization
         except:
-            levs_pol = [0]
+            levs_pol_3sigma = [0]
 
         self.noise = levs_i[0]
         self.pol_noise = levs_pol[0]
@@ -303,11 +303,14 @@ class ImageData(object):
         #first stokes I
         try:
             self.integrated_flux_clean=total_flux_from_mod("tmp/mod_files_clean/" + self.date + ".mod")
+        except:
+            self.integrated_flux_clean = 0
+        #and then polarization
+        try:
             flux_q=total_flux_from_mod("tmp/mod_files_q/" + self.date + ".mod")
             flux_u=total_flux_from_mod("tmp/mod_files_u/" + self.date + ".mod")
             self.integrated_pol_flux_clean=np.sqrt(flux_u**2+flux_q**2)
         except:
-            self.integrated_flux_clean=0
             self.integrated_pol_flux_clean=0
 
 
