@@ -89,10 +89,12 @@ class ImageData(object):
         else:
             self.no_fits=True
 
+        stokes_q_path=stokes_q
+        stokes_u_path=stokes_u
         #read stokes data from input files if defined
         if stokes_q != "":
             try:
-                stokes_q = fits.open(fits_file)[0].data[0, 0, :, :]
+                stokes_q = fits.open(stokes_q)[0].data[0, 0, :, :]
             except:
                 stokes_q=stokes_q
         else:
@@ -100,7 +102,7 @@ class ImageData(object):
 
         if stokes_u != "":
             try:
-                stokes_u = fits.open(fits_file)[0].data[0, 0, :, :]
+                stokes_u = fits.open(stokes_u)[0].data[0, 0, :, :]
             except:
                 stokes_u = stokes_u
         else:
@@ -171,6 +173,7 @@ class ImageData(object):
             only_stokes_i = True #in this case override the polarization data with the data that was input to Q and U
 
         if only_stokes_i:
+            #DIFMAP Style
             pols=1
             # Check if linpol/evpa/stokes_i have same dimensions!
             dim_wrong = True
@@ -194,6 +197,7 @@ class ImageData(object):
                     self.evpa=np.zeros(np.shape(self.Z))
             self.image_data[0, 0, :, :] = self.Z
         else:
+            #CASA STYLE
             pols=3
             dim_wrong=False
             self.stokes_q=hdu_list[0].data[1,0,:,:]
@@ -204,6 +208,8 @@ class ImageData(object):
         if pol_from_stokes and not dim_wrong:
             self.lin_pol = np.sqrt(self.stokes_q ** 2 + self.stokes_u ** 2)
             self.evpa = 0.5 * np.arctan2(self.stokes_u, self.stokes_q)
+            #shift to 0-180 (only positive)
+            self.evpa[np.where(self.evpa<0)] = self.evpa[np.where(self.evpa<0)]+np.pi
 
 
         # Set beam parameters
@@ -259,15 +265,13 @@ class ImageData(object):
                                             self.evpa)
         self.evpa_average = np.average(integrate_evpa)
 
-
-        ##TODO check for "is_casa_model" and if so, import the CASA model!
         if model!="" and not is_casa_model:
             #TODO basic checks if file is valid
             self.model=getComponentInfo(model)
             #write .mod file from .fits input
             os.makedirs(model_save_dir,exist_ok=True)
             write_mod_file(self.model, model_save_dir + self.date + ".mod", freq=self.freq)
-        elif model!="" and is_casa_model:
+        if is_casa_model:
             #TODO basic checks if file is valid
             os.makedirs(model_save_dir,exist_ok=True)
             os.makedirs(model_save_dir+"mod_files_clean", exist_ok=True)
@@ -290,9 +294,9 @@ class ImageData(object):
                 self.model = model_i
             write_mod_file(model_i, "tmp/mod_files_clean/"+ self.date + ".mod", freq=self.freq)
             #load stokes q and u clean models
-            model_q=getComponentInfo(stokes_q)
+            model_q=getComponentInfo(stokes_q_path)
             write_mod_file(model_q, "tmp/mod_files_q/" + self.date + ".mod", freq=self.freq)
-            model_u=getComponentInfo(stokes_u)
+            model_u=getComponentInfo(stokes_u_path)
             write_mod_file(model_u, "tmp/mod_files_u/" + self.date + ".mod", freq=self.freq)
         except:
             pass
@@ -335,7 +339,8 @@ class FitsImage(object):
                  xlim=[], #xplot limits, e.g. [5,-5]
                  ylim=[], #yplot limits
                  ###HERE STARTS POLARIZATION INPUT
-                 plot_evpa=True, #decide whether to plot EVPA or not
+                 plot_evpa=False, #decide whether to plot EVPA or not
+                 evpa_width=2, #choose width of EVPA lines
                  evpa_len=8,  # choose length of EVPA in pixels
                  lin_pol_sigma_cut=3,  # choose lowest sigma contour for Lin Pol plot
                  evpa_distance=10,  # choose distance of EVPA vectors to draw in pixels
@@ -364,6 +369,7 @@ class FitsImage(object):
         degpp = self.clean_image.degpp
         extent = self.clean_image.extent
         date=self.clean_image.date
+        self.evpa_width=evpa_width
         # Set beam parameters
         beam_maj = self.clean_image.beam_maj
         beam_min = self.clean_image.beam_min
@@ -419,11 +425,17 @@ class FitsImage(object):
                 self.evpa_color="black"
                 contour_color="grey"
 
-            if plot_evpa:
-                self.plotEvpa(self.clean_image.evpa, rotate_evpa, evpa_len, evpa_distance, levs1_linpol, levs1)
+        if plot_evpa and np.sum(self.clean_image.lin_pol)!=0:
+            levs_linpol, levs1_linpol = get_sigma_levs(self.clean_image.lin_pol, lin_pol_sigma_cut)
+            self.plotEvpa(self.clean_image.evpa, rotate_evpa, evpa_len, evpa_distance, levs1_linpol, levs1)
 
         # Contour plot
         if contour == True:
+            if contour_cmap=="" or contour_cmap==None:
+                contour_cmap=None
+            else:
+                contour_color=None
+
             self.ax.contour(X, Y, Z, linewidths=contour_width, levels=levs, colors=contour_color,
                             alpha=contour_alpha,
                             cmap=contour_cmap)
@@ -561,30 +573,29 @@ class FitsImage(object):
         # create mask where to plot EVPA (only where stokes i and lin pol have plotted contours)
         mask = np.zeros(np.shape(stokes_i), dtype=bool)
         mask[:] = (self.clean_image.lin_pol > levs1_linpol[0]) * (stokes_i > levs1_i[0])
-        XLoc, YLoc = np.where(mask)
+        YLoc, XLoc = np.where(mask)
 
         y_evpa = evpa_len * np.cos(evpa[mask])
         x_evpa = evpa_len * np.sin(evpa[mask])
+        evpa=evpa[mask]
 
-        SelPix = range(0, len(stokes_i), evpa_distance)
+        SelPix = range(0, len(stokes_i), int(evpa_distance))
 
         lines = []
         for i in range(0, len(XLoc)):
             if XLoc[i] in SelPix and YLoc[i] in SelPix:
-                Xpos = -float(self.clean_image.X[XLoc[i]]) #TODO check where the minus comes from!
-                Ypos = -float(self.clean_image.Y[YLoc[i]]) #TODO check where the minus comes from!
-                X0 = float(Xpos - x_evpa[i] / 2.)
-                X1 = float(Xpos + x_evpa[i] / 2.)
+                Xpos = float(self.clean_image.X[XLoc[i]])
+                Ypos = float(self.clean_image.Y[YLoc[i]])
                 Y0 = float(Ypos - y_evpa[i] / 2.)
                 Y1 = float(Ypos + y_evpa[i] / 2.)
-                lines.append(((Y0, X0), (Y1, X1)))
+                X0 = float(Xpos - x_evpa[i] / 2.)
+                X1 = float(Xpos + x_evpa[i] / 2.)
+                lines.append(((X0, Y0), (X1, Y1)))
         lines = tuple(lines)
-
-        ##TODO something is still wrong here with the sign and orientation of the EVPA, please double check!
 
 
         # plot the evpas
-        evpa_lines = LineCollection(lines, colors=self.evpa_color, linewidths=2)
+        evpa_lines = LineCollection(lines, colors=self.evpa_color, linewidths=self.evpa_width)
         self.ax.add_collection(evpa_lines)
 
 

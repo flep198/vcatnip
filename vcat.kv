@@ -692,7 +692,243 @@
                             id: evpa
                             size_hint_x: 0.4
             BoxLayout:
+                orientation: 'horizontal'
+                size_hint_y: 0.05
+                BoxLayout
+                BoxLayout:
+                    ToggleButton:
+                        id: plot_mode_i
+                        text: "Stokes I"
+                        group: "plot_mode_select"
+                        state: "down"
+                    ToggleButton:
+                        id: plot_mode_linpol
+                        text: "Lin. Pol."
+                        group: "plot_mode_select"
+                    ToggleButton:
+                        id: plot_mode_fracpol
+                        text: "Frac. Pol."
+                        group: "plot_mode_select"
+                    Button:
+                        id: replot_btn
+                        text: "Replot"
+                        on_release: root.replot()
+                BoxLayout
+            BoxLayout:
                 size_hint_y: 0.4
+                padding: 10
+                orientation: 'horizontal'
+                BoxLayout:
+                    orientation: 'vertical'
+                    Label:
+                        text: "Colors & Style"
+                        size_hint_y: 0.1
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Colormap?"
+                        CheckBox:
+                            id: im_colormap
+                        Label:
+                            text: "Colormap"
+                        TextInput:
+                            id: im_color
+                            text: 'inferno'
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Contour?"
+                        CheckBox:
+                            id: contour
+                            active: True
+                        Label:
+                            text: "Sigma Cut (Stokes I)"
+                        TextInput:
+                            id: stokes_i_sigma_cut
+                            text: '3'
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Contour Color"
+                        TextInput:
+                            id: contour_color
+                            text: "black"
+                        Label:
+                            text: "Contour Colormap"
+                        TextInput:
+                            id: contour_cmap
+                            text: ''
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Contour Alpha"
+                        TextInput:
+                            id: contour_alpha
+                            text: "1"
+                        Label:
+                            text: "Contour Width"
+                        TextInput:
+                            id: contour_width
+                            text: '0.5'
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Component Color"
+                        TextInput:
+                            id: component_color
+                            text: "black"
+                        Label:
+                            text: "rcParams"
+                        TextInput:
+                            id: rcparams
+                            text: ''
+                BoxLayout:
+                    orientation: 'vertical'
+                    padding: 20
+                    Label:
+                        text: "General"
+                        size_hint_y: 0.1
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Title"
+                        TextInput:
+                            id: title
+                        Label:
+                            text: "Plot Beam?"
+                        CheckBox:
+                            id: plot_beam
+                            active: True
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Plot Gauss Modelfit?"
+                        CheckBox:
+                            id: overplot_gauss
+                        Label:
+                            text: "Plot Clean?"
+                        CheckBox:
+                            id: overplot_clean
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "RA min"
+                        TextInput:
+                            id: ra_min
+                        Label:
+                            text: "RA max"
+                        TextInput:
+                            id: ra_max
+                        Label:
+                            text: "DEC min"
+                        TextInput:
+                            id: dec_min
+                        Label:
+                            text: "DEC max"
+                        TextInput:
+                            id: dec_max
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'vertical'
+                    Label:
+                        text: "Polarization"
+                        size_hint_y: 0.1
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Plot EVPA?"
+                        CheckBox:
+                            id: plot_evpa
+                            active: False
+                        Label:
+                            text: "Rotate EVPA (deg)"
+                        TextInput:
+                            id: rotate_evpa
+                            text: "0"
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "EVPA len (pix)"
+                        TextInput:
+                            id: evpa_len
+                            text: "8"
+                        Label:
+                            text: "EVPA dist (pix)"
+                        TextInput:
+                            id: evpa_distance
+                            text: "10"
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "EVPA color"
+                        TextInput:
+                            id: evpa_color
+                            text: "white"
+                        Label:
+                            text: "EVPA Width"
+                        TextInput:
+                            id: evpa_width
+                            text: "2"
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Lin Pol Sigma Cut"
+                        TextInput:
+                            id: lin_pol_sigma_cut
+                            text: "3"
+
+
+
 
 
 

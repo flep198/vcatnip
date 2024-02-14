@@ -68,6 +68,7 @@ class ModelFits(TabbedPanel):
 
     #### PLOTTING variables
     plotting_single_plots = []
+    plotting_single_plots_data = []
     plotting_single_plot_buttons = []
     plotting_single_plot_checkboxes = []
 
@@ -719,7 +720,7 @@ class ModelFits(TabbedPanel):
                 else:
                     model=""
                 plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind])
-                image=FitsImage(plot_data,plot_mode="frac_pol")
+                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True)
             else:
                 #try to load model from clean .fits file
                 if len(self.modelfit_filepaths)>ind:
@@ -727,7 +728,7 @@ class ModelFits(TabbedPanel):
                 else:
                     model=""
                 plot_data=ImageData(file,model=model)
-                image=FitsImage(plot_data,plot_mode="frac_pol")
+                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True)
 
             #check if polarization information was given:
             if np.sum(image.clean_image.stokes_q)==0 or np.sum(image.clean_image.stokes_u)==0:
@@ -946,7 +947,11 @@ class ModelFits(TabbedPanel):
 
     def change_final_stack_plot(self,mode,button):
         if self.final_stack_image!="":
-            StackPlot = FitsImage(self.final_stack_image,plot_mode=mode,title="Stacked Image")
+            if mode in ["lin_pol","frac_pol"]:
+                plot_evpa=True
+            else:
+                plot_evpa=False
+            StackPlot = FitsImage(self.final_stack_image,plot_mode=mode,plot_evpa=plot_evpa,title="Stacked Image")
             self.ids.stacked_image.figure = StackPlot.fig
             button.state="down"
 
@@ -966,7 +971,7 @@ class ModelFits(TabbedPanel):
     ### BEGIN PLOT VIEW
 
     def load_plotting_files(self):
-
+    ### TODO disable pol buttons if there is no polarization in input
         for ind,clean_file in enumerate(self.clean_filepaths):
 
             clean_path=self.clean_filepaths[ind]
@@ -980,23 +985,16 @@ class ModelFits(TabbedPanel):
             except:
                 stokes_u_path= ""
             try:
-                stokes_q_path = self.stokes_u_filepaths[ind]
+                stokes_q_path = self.stokes_q_filepaths[ind]
             except:
                 stokes_q_path = ""
 
-            try:#CASA STYLE
-                plot_data=ImageData(clean_file,
-                                model=self.casa_clean_model_filepaths[ind],
-                                stokes_q=stokes_q_path,
-                                stokes_u=stokes_u_path,
-                                model_save_dir="tmp/",
-                                is_casa_model=True)
-            except:#DIFMAP STYLE
-                plot_data=ImageData(clean_file,
-                                model=model_path,
-                                stokes_q=stokes_q_path,
-                                stokes_u=stokes_u_path)
-
+            try:# import CASA STYLE models
+                ImageData(self.casa_clean_model_filepaths[ind],model_save_dir="tmp/",is_casa_model=True)
+            except:
+                pass
+            plot_data=ImageData(clean_path,model=model_path,stokes_q=stokes_q_path,stokes_u=stokes_u_path)
+            self.plotting_single_plots_data.append(plot_data)
             plot=FitsImage(plot_data)
             self.plotting_single_plots.append(plot)
 
@@ -1035,9 +1033,63 @@ class ModelFits(TabbedPanel):
         self.ids.stokes_i_noise.text = "{:.2f}".format(image.noise*1000) + " mJy/beam"
         self.ids.pol_noise.text = "{:.2f}".format(image.pol_noise*1000) + " mJy/beam"
         self.ids.evpa.text = "{:.2f}".format(image.evpa_average/np.pi*180) + "°"
-        """
-        self.fractional_polarization.text =
-        """
+        self.ids.fractional_polarization.text = (
+                "{:.2f}".format(image.integrated_pol_flux_clean/image.integrated_flux_clean*100)+"%")
+
+    #TODO IMPLEMENT THIS!
+    def replot(self):
+
+        #get parameters from input fields
+        active_button = next((t for t in ToggleButton.get_widgets('plot_mode_select') if t.state == 'down'), None)
+        try:
+            if active_button.text == "Lin. Pol.":
+                plot_mode = "lin_pol"
+            elif active_button.text == "Frac. Pol.":
+                plot_mode = "frac_pol"
+            else:
+                plot_mode = "stokes_i"
+        except:
+            plot_mode = "stokes_i"
+            self.ids.plot_mode_i.state = "down"
+        try:
+            xlim = [float(self.ids.ra_min.text), float(self.ids.ra_max.text)]
+        except:
+            xlim = []
+        try:
+            ylim = [float(self.ids.dec_min.text), float(self.ids.dec_max.text)]
+        except:
+            ylim = []
+
+        for ind, data in enumerate(self.plotting_single_plots_data):
+            self.plotting_single_plots[ind] = FitsImage(data,
+                                                        plot_mode=plot_mode,
+                                                        stokes_i_sigma_cut=float(self.ids.stokes_i_sigma_cut.text),
+                                                        im_colormap = self.ids.im_colormap.active,
+                                                        contour = self.ids.contour.active,
+                                                        contour_color = self.ids.contour_color.text,
+                                                        contour_cmap = self.ids.contour_cmap.text,
+                                                        contour_alpha = float(self.ids.contour_alpha.text),
+                                                        contour_width = float(self.ids.contour_width.text),
+                                                        im_color = self.ids.im_color.text,
+                                                        plot_beam = self.ids.plot_beam.active,
+                                                        overplot_gauss = self.ids.overplot_gauss.active,
+                                                        overplot_clean = self.ids.overplot_clean.active,
+                                                        component_color = self.ids.component_color.text,
+                                                        xlim = xlim,
+                                                        ylim = ylim,
+                                                        plot_evpa = self.ids.plot_evpa.active,
+                                                        evpa_width = float(self.ids.evpa_width.text),
+                                                        evpa_len = float(self.ids.evpa_len.text),
+                                                        lin_pol_sigma_cut = float(self.ids.lin_pol_sigma_cut.text),
+                                                        evpa_distance = float(self.ids.evpa_distance.text),
+                                                        rotate_evpa = float(self.ids.rotate_evpa.text),
+                                                        evpa_color = self.ids.evpa_color.text,
+                                                        title = self.ids.title.text,
+                                                        rcparams = self.ids.rcparams.text)
+
+        #find active button
+        active_button = next((t for t in ToggleButton.get_widgets('plotting_single_plots') if t.state == 'down'), None)
+        self.change_plotting_single_plot(button=active_button)
 
 
 
