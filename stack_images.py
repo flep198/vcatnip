@@ -329,107 +329,6 @@ def get_sigma_levs(image, #2d array/list
     
     return levs,levs1[0]
 
-#function to plot polarization image either with stokes q and u as input or with lin. pol. and evpa
-def plot_pol_image(stokes_i, #2d list/array of stokes i data
-        lin_pol=[], #2d list/array of lin pol data
-        evpa=[], #2d list/array of evpa data
-        pol_from_stokes=False, #choose whether to use lin_pol & evpa input (False) OR stokes_q and stokes_u input (TRUE)
-        stokes_q=[], #2d list/array of stokes_q data
-        stokes_u=[], #2d list/array of stokes_u data
-        evpa_len=4, #choose length of EVPA in pixels
-        stokes_i_sigma_cut=3, #choose lowest sigma contour for Stokes I plot
-        lin_pol_sigma_cut=3, #choose lowest sigma contour for Lin Pol plot
-        evpa_distance=10, #choose distance of EVPA vectors to draw
-        rotate_evpa=0, #rotate EVPAs by a given angle in degrees (North through East) 
-        cmap="inferno", #choose matplotlib colormap for plot
-        rcparams={} #option to modify matplotlib look
-        ):
-    
-    #update plot look
-    plt.rcParams.update(rcparams)
-
-    #Check if linpol/evpa/stokes_i have same dimensions!
-    dim_wrong=True
-    if pol_from_stokes:
-        if np.shape(stokes_i) == np.shape(stokes_q) and np.shape(stokes_i) == np.shape(stokes_u):
-            dim_wrong=False
-    else:
-        if np.shape(stokes_i) == np.shape(lin_pol) and np.shape(stokes_i) == np.shape(evpa):
-            dim_wrong=False
-
-
-    X = np.linspace(0,len(stokes_i),len(stokes_i))
-    Y = np.linspace(0,len(stokes_i[0]),len(stokes_i[0]))
-
-    #plot total intensity (stokes i)
-
-    plot_levs_i, lowest_contour_i = get_sigma_levs(stokes_i,sigma_contour_limit=stokes_i_sigma_cut)
-    fig, ax = plt.subplots()
-
-    ax.imshow(stokes_i, norm = colors.SymLogNorm(linthresh = lowest_contour_i, 
-        linscale = 0.5, 
-        vmin = 1 * lowest_contour_i, 
-        vmax = 0.5 * np.max(stokes_i),base=10), 
-        origin="lower",
-        cmap=cmap)
-    ax.contour(X,Y,stokes_i,levels=plot_levs_i,colors="white")
-
-    plt.show()
-
-    if dim_wrong:
-        raise Exception("Warning! Polarization data has wrong dimensions, could not produce polarization plot.")
-    else:
-        #calculate EVPA and lin pol from stokes q and u
-        if pol_from_stokes:
-            lin_pol=np.sqrt(stokes_q**2+stokes_u**2)
-            evpa=0.5*np.arctan2(stokes_u,stokes_q)
-   
-        lin_pol[np.isnan(lin_pol)]=0.0
-
-        #plot linear polarization
-
-        plot_levs_lin_pol, lowest_contour_lin_pol = get_sigma_levs(lin_pol,sigma_contour_limit=lin_pol_sigma_cut) #TRY USING stokes i levels and noise here
-        fig, ax = plt.subplots()
-
-        ax.imshow(lin_pol, norm = colors.SymLogNorm(linthresh = lowest_contour_lin_pol, 
-            linscale = 0.5, 
-            vmin = 1 * lowest_contour_lin_pol, 
-            vmax = 0.5 * np.max(lin_pol),base=10), 
-            origin="lower",
-            cmap=cmap)
-        ax.contour(X,Y,lin_pol,levels=plot_levs_lin_pol,colors="white")
-
-        #plot EVPA
-        evpa=evpa+rotate_evpa/180*np.pi
-
-        #create mask where to plot EVPA (only where stokes i and lin pol have plotted contours)
-        mask = np.zeros(np.shape(stokes_i),dtype=bool)
-        mask[:] = (lin_pol > lowest_contour_lin_pol)*(stokes_i > lowest_contour_i)
-        XLoc, YLoc = np.where(mask)
-
-        y_evpa=evpa_len*np.cos(evpa[mask])
-        x_evpa=evpa_len*np.sin(evpa[mask])
-
-        SelPix = range(0,len(stokes_i),evpa_distance)
-    
-        lines=[]
-        for i in range(0,len(XLoc)):
-            if XLoc[i] in SelPix and YLoc[i] in SelPix:
-                Xpos = float(XLoc[i])
-                Ypos = float(YLoc[i])
-                X0 = float(Xpos-x_evpa[i]/2.)
-                X1 = float(Xpos+x_evpa[i]/2.)
-                Y0 = float(Ypos-y_evpa[i]/2.)
-                Y1 = float(Ypos+y_evpa[i]/2.)
-                lines.append(((Y0,X0),(Y1,X1)))    
-        lines = tuple(lines)
-
-        #plot the evpas
-        evpa_lines = LineCollection(lines,colors='r',linewidths=2)
-        ax.add_collection(evpa_lines)
-
-        plt.show()
-
 #this method is intended to determine the (smallest) common beam of multiple fits-images
 
 def get_common_beam(fits_files,
@@ -437,9 +336,10 @@ def get_common_beam(fits_files,
         plot_beams=False, #makes a simple plot of all the beams for double checking
         tolerance=0.0001 #adjust the numeric tolarance for determining the common beam
         ):
-       
-    fig = plt.figure()
-    ax = fig.add_subplot()
+
+    if plot_beams:
+        fig = plt.figure()
+        ax = fig.add_subplot()
 
     sample_points=np.empty(shape=(ppe*len(fits_files),2))
     for ind,file_path in enumerate(fits_files):
@@ -618,7 +518,7 @@ def fold_with_beam(fits_files, #array of file paths to fits images input
 
         for ind, fits_file in enumerate(fits_files):
             send_difmap_command("obs " + uvf_files[ind])
-            send_difmap_command("uvw 0,-1") #use natural weighting
+            send_difmap_command("uvw 0,-1")  #use natural weighting
             send_difmap_command("select " + channel)
             send_difmap_command("rmod " + mod_files[ind])
             if do_selfcal:
@@ -631,25 +531,3 @@ def fold_with_beam(fits_files, #array of file paths to fits images input
         
         print("Convolution complete!")
 
-if __name__ == '__main__':
-    
-    #Some basic testing
-
-    import glob
-    #stack1=stack_fits(["0506+056.u.2023_07_01.icn.fits","0506+056.u.2023_07_01.icn.fits"],stokes_q_fits=["0506+056.u.2023_07_01.icn.fits","0506+056.u.2023_07_01.icn.fits"],stokes_u_fits=["0506+056.u.2023_07_01.icn.fits","0506+056.u.2023_07_01.icn.fits"])
-    #plot_pol_image(stack1[0][0],lin_pol=stack1[1][0],evpa=stack1[2][0],stokes_i_sigma_cut=5)#),pol_from_stokes=True,stokes_q=stack1[1][0],stokes_u=stack1[2][0])
-    #stack2=stack_fits(glob.glob("*.fits"))
-    #plot_pol_image(stack2[0][0])#,lin_pol=stack2[1][0],evpa=stack2[2][0])
-
-    print(fold_with_beam(glob.glob("*.fits"),difmap_path="/opt/uvf_difmap_2.5p/",use_common_beam=True))
-
-
-    #stack1=stack_fits(["BR224AKu_imaged/polarization/0506_final_pol.fits","BR224BKu_imaged/polarization/0506_final_pol.fits"])
-    #plot_pol_image(stack1[0][0],pol_from_stokes=True,stokes_q=stack1[1][0],stokes_u=stack1[2][0])
-
-    #stack2=stack_pol_fits(["BR224AKu_imaged/polarization/0506_final_pol.fits","BR224BKu_imaged/polarization/0506_final_pol.fits"],weighted=True)
-    #plot_pol_image(stack2[0][0],lin_pol=stack2[1][0],evpa=stack2[2][0])
-
-    #file=fits.open("3C279_final_pol.fits")[0].data
-    #plot_pol_image(file[0][0],pol_from_stokes=True,stokes_q=file[1][0],stokes_u=file[2][0])
-    #print(align_images([[[1,4,3,4],[1,2,3,3],[1,2,3,3],[1,2,3,3]],[[1,2,3,3],[1,2,3,4],[1,2,3,3],[5,2,3,3]]]))

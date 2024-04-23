@@ -152,6 +152,7 @@ class ImageData(object):
         if not self.no_fits:
             self.image_data = hdu_list[0].data
             self.Z = self.image_data[0, 0, :, :]
+
         else:
             try:
                 self.Z=self.stokes_i
@@ -465,7 +466,7 @@ class FitsImage(object):
             model_df = getComponentInfo(self.model_image_file)
 
             # sort in gauss and clean components
-            model_gauss_df = model_df[model_df["Major_axis"] > 0.].reset_index()
+            model_gauss_df = model_df #model_df[model_df["Major_axis"] > 0.].reset_index()
             model_clean_df = model_df[model_df["Major_axis"] == 0.].reset_index()
 
             # Overplot clean components
@@ -525,7 +526,7 @@ class FitsImage(object):
                      extent, #plot lims x_min,x_max,y_min,y_max
                      label="Flux Density [Jy]" #label for colorbar
                      ):
-        col = self.ax.imshow(Z, cmap=im_color, norm=colors.SymLogNorm(linthresh=levs1[0], linscale=0.5, vmin=levs[99],
+        col = self.ax.imshow(Z, cmap=im_color, norm=colors.SymLogNorm(linthresh=levs1[0], linscale=0.5, vmin=levs1[0],
                                                                       vmax=0.5 * np.max(Z), base=10.), extent=extent,
                              origin='lower')
         divider = make_axes_locatable(self.ax)
@@ -539,6 +540,11 @@ class FitsImage(object):
         comp = Ellipse([x * scale, y * scale], maj * scale, min * scale, -pos + 90,
                        fill=False, zorder=2, color=self.component_color, lw=0.5)
         ellipse=self.ax.add_artist(comp)
+
+        #deal with point like components
+        if maj==0 and min==0:
+            maj=0.1/scale
+            min=0.1/scale
 
         # Plotting axes of the ellipses
         maj1_x = x - np.sin(-np.pi / 180 * pos) * maj * 0.5

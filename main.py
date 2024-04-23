@@ -476,7 +476,7 @@ class ModelFits(TabbedPanel):
                                 t_min = comp[1].year
                             if comp[1].distance_to_core*comp[1].scale > d_max:
                                 d_max = comp[1].distance_to_core*comp[1].scale
-                            if comp[1].tb > tb_max:
+                            if comp[1].tb > tb_max and comp[1].tb != float('inf'):
                                 tb_max = comp[1].tb
                             if comp[1].tb < tb_min:
                                 tb_min = comp[1].tb
@@ -1033,8 +1033,11 @@ class ModelFits(TabbedPanel):
         self.ids.stokes_i_noise.text = "{:.2f}".format(image.noise*1000) + " mJy/beam"
         self.ids.pol_noise.text = "{:.2f}".format(image.pol_noise*1000) + " mJy/beam"
         self.ids.evpa.text = "{:.2f}".format(image.evpa_average/np.pi*180) + "°"
-        self.ids.fractional_polarization.text = (
-                "{:.2f}".format(image.integrated_pol_flux_clean/image.integrated_flux_clean*100)+"%")
+        if image.integrated_flux_clean!=0:
+            self.ids.fractional_polarization.text = (
+                    "{:.2f}".format(image.integrated_pol_flux_clean/image.integrated_flux_clean*100)+"%")
+        else:
+            self.ids.fractional_polarization.text = "-"
 
     #TODO IMPLEMENT THIS!
     def replot(self):
