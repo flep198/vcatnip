@@ -63,7 +63,6 @@ class ComponentCollection():
         self.fluxs = []
         self.tbs = []
 
-
         for comp in components:
             self.year.append(comp.year)
             self.dist.append(comp.distance_to_core * self.scale)

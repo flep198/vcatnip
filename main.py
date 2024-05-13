@@ -210,7 +210,7 @@ class ModelFits(TabbedPanel):
             return None
 
     def create_kinematic_plots(self):
-        #sort files by date
+        #TODO sort files by date?
         date=[]
         fits_images=[]
 
@@ -239,9 +239,11 @@ class ModelFits(TabbedPanel):
         elif len(self.clean_filepaths) > 0 and len(self.modelfit_filepaths) ==0:
             self.show_popup("Warning","No modelfits imported","Continue")
 
-
-
+        frequencies=[]
         for plot in fits_images:
+            frequency="{:.1f}".format(plot.freq/1e9)+" GHz"
+            if not frequency in frequencies:
+                frequencies.append(frequency)
             self.plots.append(plot)
             self.name=plot.name
             new_figure=MatplotFigure(size_hint_x=None,
@@ -250,6 +252,46 @@ class ModelFits(TabbedPanel):
             new_figure.touch_mode="pan"
             self.ids.figures.add_widget(new_figure)
             self.figure_widgets.append(new_figure)
+
+        #create frequency toggle switches if multiple frequencies were imported
+        for ind,frequency in enumerate(frequencies):
+
+            #add buttons for the final kinematic plot to switch between frequencies
+            toggle_state="down" if ind==0 else "normal"
+            button = ToggleButton(
+                text=frequency,
+                size_hint_y=1,
+                group="plot_frequency_select",
+                state=toggle_state
+            )
+            button.bind(on_release=self.update_kinematic_plot)
+            self.ids.plot_frequency_select_buttons.add_widget(button)
+
+            #add buttons for the scroll view to hide/show specific frequencies
+            button = ToggleButton(
+                text=frequency,
+                size_hint_y=1,
+                state="down"
+            )
+            button.bind(on_release=self.update_scroll_plots)
+            self.ids.scroll_frequency_select_buttons.add_widget(button)
+
+    #takes care of showing/hiding plots depending on the frequency selected.
+    def update_scroll_plots(self,button_dummy):
+        #remove all plots from scroll view
+        for widget in self.figure_widgets:
+            self.ids.figures.remove_widget(widget)
+
+        #add back only the ones that are selected
+        for ind,plot in enumerate(self.plots):
+            for button in self.ids.scroll_frequency_select_buttons.children:
+                if "{:.1f}".format(plot.freq/1e9)+" GHz" == button.text:
+                    if button.state=="down":
+                        self.ids.figures.add_widget(self.figure_widgets[ind])
+                    else:
+                        self.ids.figures.remove_widget(self.figure_widgets[ind])
+
+
 
     def change_plot_lims(self):
         #try since the text might be no numbers
@@ -456,16 +498,25 @@ class ModelFits(TabbedPanel):
         self.component_collections=[]
         self.update_core_dist()
 
+        #filter out which frequency to plot
+        frequency_button = next((t for t in ToggleButton.get_widgets('plot_frequency_select') if t.state == 'down'), None)
+        frequency_to_plot=frequency_button.text
+        plots_to_fit=[]
+        for plot in self.plots:
+            if "{:.1f}".format(plot.freq/1e9)+" GHz" == frequency_to_plot:
+                plots_to_fit.append(plot)
+
+
         t_max=0
-        if len(self.plots)>0:
-            t_min=self.plots[0].components[0][1].year
+        if len(plots_to_fit)>0:
+            t_min=plots_to_fit[0].components[0][1].year
             d_max=0
             tb_max=0
-            tb_min=self.plots[0].components[0][1].tb
+            tb_min=plots_to_fit[0].components[0][1].tb
             flux_max=0
             for i in range(len(self.components)):
                 collection=[]
-                for plot in self.plots:
+                for plot in plots_to_fit:
                     for comp in plot.components:
                         if comp[1].component_number == i:
                             collection.append(comp[1])
@@ -516,9 +567,9 @@ class ModelFits(TabbedPanel):
                             final_row=row
                 try:
                     labels=final_row.children
-                    labels[2].text="{:.2f}".format(fit_data["speed"])+" +/- "+"{:.2f}".format(fit_data["speed_err"])
-                    labels[1].text="{:.2f}".format(fit_data["beta_app"])+" +/- "+"{:.2f}".format(fit_data["beta_app_err"])
-                    labels[0].text="{:.2f}".format(fit_data["d_crit"])+" +/- "+"{:.2f}".format(fit_data["d_crit_err"])
+                    labels[2].text="{:.2f}".format(fit_data["speed"])+" +/- "+"{:.2f}".format(abs(fit_data["speed_err"]))
+                    labels[1].text="{:.2f}".format(fit_data["beta_app"])+" +/- "+"{:.2f}".format(abs(fit_data["beta_app_err"]))
+                    labels[0].text="{:.2f}".format(fit_data["d_crit"])+" +/- "+"{:.2f}".format(abs(fit_data["d_crit_err"]))
                 except:
                     pass
 
