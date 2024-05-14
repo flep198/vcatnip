@@ -500,11 +500,17 @@ class ModelFits(TabbedPanel):
 
         #filter out which frequency to plot
         frequency_button = next((t for t in ToggleButton.get_widgets('plot_frequency_select') if t.state == 'down'), None)
-        frequency_to_plot=frequency_button.text
-        plots_to_fit=[]
-        for plot in self.plots:
-            if "{:.1f}".format(plot.freq/1e9)+" GHz" == frequency_to_plot:
-                plots_to_fit.append(plot)
+        if (len(ToggleButton.get_widgets('plot_frequency_select'))>0):
+            if (frequency_button == None):
+                frequency_button = ToggleButton.get_widgets('plot_frequency_select')[0]
+                frequency_button.state = "down"
+            frequency_to_plot=frequency_button.text
+            plots_to_fit=[]
+            for plot in self.plots:
+                if "{:.1f}".format(plot.freq/1e9)+" GHz" == frequency_to_plot:
+                    plots_to_fit.append(plot)
+        else:
+            plots_to_fit=self.plots
 
 
         t_max=0
@@ -612,7 +618,7 @@ class ModelFits(TabbedPanel):
 
     #used to save/export the kinematic results, writes a directory which includes two .csv files for the component info
     #and a sub-folder /fits with the fits files, and pdf and png files for the plots
-    def save_kinematics(self,save_text,selection):
+    def save_kinematics(self,save_text,selection): #TODO check if it works with multiple frequencies!
         save_path=str(selection[0])
 
         #set default file name if name was not specified
@@ -628,7 +634,7 @@ class ModelFits(TabbedPanel):
 
         #copy fits files to common directory
         for file in self.modelfit_filepaths:
-            os.system("cp " + file + " " + save_path + "/modelfit_filess/")
+            os.system("cp " + file + " " + save_path + "/modelfit_files/")
 
         for file in self.clean_filepaths:
             os.system("cp " + file + " " + save_path + "/clean_fits/")
@@ -685,7 +691,7 @@ class ModelFits(TabbedPanel):
     #used to reimport data that was exported with the function above. Needs a directory path
     def import_kinematics(self,directory):
 
-        #TODO reset everything before importing stuff
+        #TODO reset everything before importing stuff and check if it works with multiple frequencies!
 
         #check if it is a valid vcat kinematics folder
         if (os.path.isfile(directory[0]+"/component_info.csv") and os.path.isfile(directory[0]+"/kinematic_fit.csv") and
@@ -695,7 +701,7 @@ class ModelFits(TabbedPanel):
             selection=glob.glob(directory[0]+"/modelfit_files/*")
             self.load_modelfit(selection)
             selection = glob.glob(directory[0] + "/clean_fits/*")
-            self.load_modelfit(selection)
+            self.load_clean(selection)
             self.create_kinematic_plots()
 
             #add components
@@ -714,7 +720,7 @@ class ModelFits(TabbedPanel):
                     t.state='normal'
             self.set_active_component()
 
-
+            frequencies=[]
             #now identify them with each other
             for plot in self.plots:
                 for comp in plot.components:
@@ -722,7 +728,7 @@ class ModelFits(TabbedPanel):
                     filter_df=comp_info[(round(comp_info["x"],15)==round(comp[1].x,15))]
                     ind=filter_df[round(comp_info["y"],15)==round(comp[1].y,15)]["component_number"].values[0]
 
-                    if ind>=0: #only due this if component was assigned
+                    if ind>=0: #only do this if component was assigned
                         #activate correct button
                         for t in ToggleButton.get_widgets('components'):
                             if "Component " + str(ind) in t.text:
@@ -738,7 +744,6 @@ class ModelFits(TabbedPanel):
                         comp[1].assign_component_number(self.active_component_ind)
 
                         self.set_active_component()
-
             self.update_kinematic_plot()
 
             #set redshift

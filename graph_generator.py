@@ -457,7 +457,7 @@ class FitsImage(object):
             self.ax.add_artist(beam)
 
         if title=="":
-            self.ax.set_title(date, fontsize=font_size_axis_title)
+            self.ax.set_title(date + " " + "{:.1f}".format(self.freq/1e9)+" GHz", fontsize=font_size_axis_title)
         else:
             self.ax.set_title(title, fontsize=font_size_axis_title)
 
