@@ -317,14 +317,26 @@ class ModelFits(TabbedPanel):
             count+=1
         self.components.append("Component " + str(count))
 
+        component_box=BoxLayout(
+            size_hint_y=None,
+            height=50
+        )
+
         button=ToggleButton(
             text=self.components[-1],
-            size_hint_y=None,
-            height=50,
+            size_hint_y=1,
+            size_hint_x=0.9,
             group="components",
         )
         button.bind(on_release=self.set_active_component)
-        self.ids.component_list.add_widget(button)
+
+        checkbox=CheckBox(active=False,size_hint_x=0.1)
+        checkbox.bind(on_release=self.update_kinematic_plot)
+
+        component_box.add_widget(button)
+        component_box.add_widget(checkbox)
+        self.ids.component_list.add_widget(component_box)
+
 
         #create list entry in kinematic table
 
@@ -376,7 +388,9 @@ class ModelFits(TabbedPanel):
         button_to_remove = next( (t for t in ToggleButton.get_widgets('components') if t.state=='down'), None)
         #remove button
         if button_to_remove:
-            self.ids.component_list.remove_widget(button_to_remove)
+            #remove component button
+            self.ids.component_list.remove_widget(button_to_remove.parent)
+
             for plot in self.plots:
                 for comp in plot.components:
                     if comp[1].component_number == ind_to_remove:
@@ -469,11 +483,18 @@ class ModelFits(TabbedPanel):
         for button in ToggleButton.get_widgets('components'):
             if " (Core)" in button.text:
                 button.text=button.text.replace(" (Core)","")
+                for obj in button.parent.children:
+                    obj.disabled=False
 
         #Add "Core" to button text
         active_button = next((t for t in ToggleButton.get_widgets('components') if t.state == 'down'), None)
         if active_button:
             active_button.text=active_button.text+" (Core)"
+            for obj in active_button.parent.children:
+                if obj != active_button:
+                    obj.active = False
+                    obj.disabled=True
+
 
         #update kinematics
         self.update_kinematic_plot()
@@ -498,20 +519,103 @@ class ModelFits(TabbedPanel):
         self.component_collections=[]
         self.update_core_dist()
 
-        #filter out which frequency to plot
-        frequency_button = next((t for t in ToggleButton.get_widgets('plot_frequency_select') if t.state == 'down'), None)
-        if (len(ToggleButton.get_widgets('plot_frequency_select'))>0):
+        # find out which plot is currently selected:
+        active_button = next((t for t in ToggleButton.get_widgets('kinematic_select') if t.state == 'down'), None)
+
+
+        plots_to_fit=self.plots
+
+        #calculate Core Shift based on modelfits
+        if active_button != None and active_button.text == "Core Shift" and len(plots_to_fit)>0:
+            t_max=0
+            t_min=plots_to_fit[0].components[0][1].year
+
+            #first find available frequencies
+            frequencies=[]
+            for plot in plots_to_fit:
+                plot_freq="{:.1f}".format(plot.freq/1e9)
+                if plot_freq not in frequencies:
+                    frequencies.append(plot_freq)
+
+            #get mulfitfreq component lists for core shift and do kinematic fit
+            final_mf_fits = []
+            for i in range(len(self.components)):
+                collections=[]
+                for frequency_to_plot in frequencies:
+                    collection = []
+                    for plot in plots_to_fit:
+                        if "{:.1f}".format(plot.freq/1e9) == frequency_to_plot:
+                            for comp in plot.components:
+                                if comp[1].component_number == i:
+                                    # determine plot limits
+                                    if comp[1].year > t_max:
+                                        t_max = comp[1].year
+                                    if comp[1].year < t_min:
+                                        t_min = comp[1].year
+                                    collection.append(comp[1])
+                    fit_data=ComponentCollection(collection,name=self.components[i]).get_speed()
+                    collections.append(fit_data)
+                final_mf_fits.append(collections)
+                
+            values = []
+            #calculate core shift for selected components and plot it
+            for i in range(len(final_mf_fits)):
+
+                #check the checkboxes which components to use:
+                use=False
+                for child in self.ids.component_list.children:
+                    use1=False
+                    use2=False
+                    for child2 in child.children:
+                        if not use:
+                            if isinstance(child2,CheckBox):
+                                use1 = child2.active
+                            if isinstance(child2,ToggleButton):
+                                if "Component "+str(i) in child2.text:
+                                    use2 = True
+                            use= use1 and use2
+
+                #cast list to float
+                frequencies=[float(frequency) for frequency in frequencies]
+
+
+                for j in range(len(frequencies)):
+                    if use and j!=np.argmax(frequencies):
+                        component_fits=final_mf_fits[i]
+                        highest_freq_fits=component_fits[np.argmax(frequencies)]
+                        current_freq_fits=component_fits[j]
+                        print(highest_freq_fits)
+                        print(current_freq_fits)
+
+                        new_values=(current_freq_fits["speed"] - highest_freq_fits["speed"]) * np.array([t_max,t_min]) + (
+                                    current_freq_fits["y0"] - highest_freq_fits["y0"])
+                        values=np.append(values,new_values)
+
+                        self.kplot.plot_linear_fit(t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min),
+                                                   current_freq_fits["speed"]-highest_freq_fits["speed"],
+                                                   current_freq_fits["y0"]-highest_freq_fits["y0"], self.current_color(i),
+                                                   label=self.components[i]+", "+str(np.max(frequencies))+"-"+str(frequencies[j])+" GHz")
+            if len(values)>0:
+                plot_min_y = np.min(values)
+                plot_max_y = np.max(values)
+                self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
+                    [plot_min_y-0.2,plot_max_y+0.2])
+
+
+        # filter out which frequency to plot
+        frequency_button = next((t for t in ToggleButton.get_widgets('plot_frequency_select') if t.state == 'down'),
+                                None)
+        if (len(ToggleButton.get_widgets('plot_frequency_select')) > 0):
             if (frequency_button == None):
                 frequency_button = ToggleButton.get_widgets('plot_frequency_select')[0]
                 frequency_button.state = "down"
-            frequency_to_plot=frequency_button.text
-            plots_to_fit=[]
+            frequency_to_plot = frequency_button.text
+            plots_to_fit = []
             for plot in self.plots:
-                if "{:.1f}".format(plot.freq/1e9)+" GHz" == frequency_to_plot:
+                if "{:.1f}".format(plot.freq / 1e9) + " GHz" == frequency_to_plot:
                     plots_to_fit.append(plot)
         else:
-            plots_to_fit=self.plots
-
+            plots_to_fit = self.plots
 
         t_max=0
         if len(plots_to_fit)>0:
@@ -543,52 +647,49 @@ class ModelFits(TabbedPanel):
                 comp_collection=ComponentCollection(collection,name=self.components[i])
                 self.component_collections.append(comp_collection)
 
-                # find out which plot is currently selected:
-                active_button = next((t for t in ToggleButton.get_widgets('kinematic_select') if t.state == 'down'), None)
-
-                if active_button.text == "Flux Density":
+                if active_button != None and active_button.text == "Flux Density":
                     self.kplot.plot_fluxs(comp_collection,self.current_color(i))
                     self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
                                           [0, 1.2 * flux_max])
-                elif active_button.text == "Brightness Temperature":
+                elif active_button != None and active_button.text == "TB":
                     self.kplot.plot_tbs(comp_collection,self.current_color(i))
                     self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
                                           [tb_min, 10 * tb_max])
-                else:
+                elif active_button != None and active_button.text == "Kinematic":
                     self.kplot.plot_kinematics(comp_collection,self.current_color(i))
                     self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
                                           [0, 1.2 * d_max])
 
                 fit_data = comp_collection.get_speed()
-                if len(collection)>2 and active_button.text == "Kinematic":
+                if (active_button != None) and (len(collection)>2) and (active_button.text == "Kinematic"):
                     self.kplot.plot_linear_fit(t_min-0.1*(t_max-t_min),t_max+0.1*(t_max-t_min),
                                             fit_data["speed"],
                                             fit_data["y0"],self.current_color(i),
                                             label=self.components[i])
 
-                #write data to table
-                for row in self.ids.kinematic_list.children:
-                    for label in row.children:
-                        if label.text == str(i):
-                            final_row=row
-                try:
-                    labels=final_row.children
-                    labels[2].text="{:.2f}".format(fit_data["speed"])+" +/- "+"{:.2f}".format(abs(fit_data["speed_err"]))
-                    labels[1].text="{:.2f}".format(fit_data["beta_app"])+" +/- "+"{:.2f}".format(abs(fit_data["beta_app_err"]))
-                    labels[0].text="{:.2f}".format(fit_data["d_crit"])+" +/- "+"{:.2f}".format(abs(fit_data["d_crit_err"]))
-                except:
-                    pass
+                    #write data to table
+                    for row in self.ids.kinematic_list.children:
+                        for label in row.children:
+                            if label.text == str(i):
+                                final_row=row
+                    try:
+                        labels=final_row.children
+                        labels[2].text="{:.2f}".format(fit_data["speed"])+" +/- "+"{:.2f}".format(abs(fit_data["speed_err"]))
+                        labels[1].text="{:.2f}".format(fit_data["beta_app"])+" +/- "+"{:.2f}".format(abs(fit_data["beta_app_err"]))
+                        labels[0].text="{:.2f}".format(fit_data["d_crit"])+" +/- "+"{:.2f}".format(abs(fit_data["d_crit_err"]))
+                    except:
+                        pass
 
-            self.kplot.ax.legend()
-            self.kplot.ax.set_title(self.name)
-            self.kplot.fig.tight_layout()
-            self.kplot.ax.figure.canvas.draw_idle()
-            self.kplot.ax.figure.canvas.flush_events()
+        self.kplot.ax.legend()
+        self.kplot.ax.set_title(self.name)
+        self.kplot.fig.tight_layout()
+        self.kplot.ax.figure.canvas.draw_idle()
+        self.kplot.ax.figure.canvas.flush_events()
 
-            #export the plot as pdf and png
-            if do_export:
-                self.kplot.fig.savefig(export_path+".pdf")
-                self.kplot.fig.savefig(export_path+".png",dpi=300)
+        #export the plot as pdf and png
+        if do_export:
+            self.kplot.fig.savefig(export_path+".pdf")
+            self.kplot.fig.savefig(export_path+".png",dpi=300)
 
     def get_redshift(self):
 
@@ -618,7 +719,7 @@ class ModelFits(TabbedPanel):
 
     #used to save/export the kinematic results, writes a directory which includes two .csv files for the component info
     #and a sub-folder /fits with the fits files, and pdf and png files for the plots
-    def save_kinematics(self,save_text,selection): #TODO check if it works with multiple frequencies!
+    def save_kinematics(self,save_text,selection):
         save_path=str(selection[0])
 
         #set default file name if name was not specified
@@ -691,7 +792,7 @@ class ModelFits(TabbedPanel):
     #used to reimport data that was exported with the function above. Needs a directory path
     def import_kinematics(self,directory):
 
-        #TODO reset everything before importing stuff and check if it works with multiple frequencies!
+        #TODO reset everything before importing stuff
 
         #check if it is a valid vcat kinematics folder
         if (os.path.isfile(directory[0]+"/component_info.csv") and os.path.isfile(directory[0]+"/kinematic_fit.csv") and
@@ -1095,7 +1196,6 @@ class ModelFits(TabbedPanel):
         else:
             self.ids.fractional_polarization.text = "-"
 
-    #TODO IMPLEMENT THIS!
     def replot(self):
 
         #get parameters from input fields
