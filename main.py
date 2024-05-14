@@ -221,23 +221,42 @@ class ModelFits(TabbedPanel):
         elif len(self.clean_filepaths) == 0 and len(self.modelfit_filepaths) == 0:
             self.show_popup("Warning", "No data selected", "Continue")
         elif len(self.clean_filepaths) == len(self.modelfit_filepaths):
+            warn_uvf=False
             #create plots for view page
             for ind,filepath in enumerate(self.modelfit_filepaths):
-                plot_data=ImageData(self.clean_filepaths[ind],model=filepath)
+                if not len(self.uvf_filepaths) == len(self.modelfit_filepaths):
+                    plot_data=ImageData(self.clean_filepaths[ind],model=filepath)
+                    warn_uvf=True
+                else:
+                    plot_data = ImageData(self.clean_filepaths[ind], model=filepath, uvf_file=self.uvf_filepaths[ind],difmap_path=self.ids.difmap_path.text)
                 plot=FitsImage(plot_data,overplot_gauss=True)
                 fits_images=np.append(fits_images,plot)
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
+            if warn_uvf:
+                self.show_popup("Warning",
+                                "No .uvf files loaded, will not be able to calculate upper limits for TB!",
+                                "Continue")
         elif len(self.clean_filepaths) == 0 and len(self.modelfit_filepaths)>0:
             # create plots for view page
-            for filepath in self.modelfit_filepaths:
-                plot_data = ImageData(filepath,model=filepath)
+            warn_uvf=False
+            for ind,filepath in enumerate(self.modelfit_filepaths):
+                if not len(self.uvf_filepaths) == len(self.modelfit_filepaths):
+                    plot_data = ImageData(filepath,model=filepath)
+                    warn_uvf=True
+                else:
+                    plot_data = ImageData(filepath, model=filepath, uvf_file=self.uvf_filepaths[ind],difmap_path=self.ids.difmap_path.text)
                 plot = FitsImage(plot_data,overplot_gauss=True)
                 fits_images = np.append(fits_images, plot)
             self.show_popup("Warning",
                             "No clean images imported, using only modelfit images.\n Have fun doing kinematics!",
                             "Continue")
+            if warn_uvf:
+                self.show_popup("Warning",
+                                "No .uvf files loaded, will not be able to calculate upper limits for TB!",
+                                "Continue")
         elif len(self.clean_filepaths) > 0 and len(self.modelfit_filepaths) ==0:
             self.show_popup("Warning","No modelfits imported","Continue")
+
 
         frequencies=[]
         for plot in fits_images:
@@ -556,7 +575,7 @@ class ModelFits(TabbedPanel):
                     fit_data=ComponentCollection(collection,name=self.components[i]).get_speed()
                     collections.append(fit_data)
                 final_mf_fits.append(collections)
-                
+
             values = []
             #calculate core shift for selected components and plot it
             for i in range(len(final_mf_fits)):
@@ -584,17 +603,23 @@ class ModelFits(TabbedPanel):
                         component_fits=final_mf_fits[i]
                         highest_freq_fits=component_fits[np.argmax(frequencies)]
                         current_freq_fits=component_fits[j]
-                        print(highest_freq_fits)
-                        print(current_freq_fits)
 
-                        new_values=(current_freq_fits["speed"] - highest_freq_fits["speed"]) * np.array([t_max,t_min]) + (
-                                    current_freq_fits["y0"] - highest_freq_fits["y0"])
-                        values=np.append(values,new_values)
+                        #only do it if the fit worked
+                        if not ((highest_freq_fits["speed"]==0 and highest_freq_fits["y0"]==0)
+                                or (current_freq_fits["speed"]==0 and current_freq_fits["y0"]==0)):
 
-                        self.kplot.plot_linear_fit(t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min),
-                                                   current_freq_fits["speed"]-highest_freq_fits["speed"],
-                                                   current_freq_fits["y0"]-highest_freq_fits["y0"], self.current_color(i),
-                                                   label=self.components[i]+", "+str(np.max(frequencies))+"-"+str(frequencies[j])+" GHz")
+                            #calculate core shift evolution
+                            new_values=(current_freq_fits["speed"] - highest_freq_fits["speed"]) * np.array([t_max,t_min]) + (
+                                        current_freq_fits["y0"] - highest_freq_fits["y0"])
+                            #get extreme values to calculate plot lims
+                            values=np.append(values,new_values)
+
+                            #plot it
+                            self.kplot.plot_linear_fit(t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min),
+                                                       current_freq_fits["speed"]-highest_freq_fits["speed"],
+                                                       current_freq_fits["y0"]-highest_freq_fits["y0"], self.current_color(i),
+                                                       label=self.components[i]+", "+str(np.max(frequencies))+"-"+str(frequencies[j])+" GHz")
+            #set plot lims
             if len(values)>0:
                 plot_min_y = np.min(values)
                 plot_max_y = np.max(values)
@@ -989,14 +1014,14 @@ class ModelFits(TabbedPanel):
                     image=ImageData(files_to_stack[i],model=files_to_stack_models[i])
                 else:
                     image=ImageData(files_to_stack[i])
-                mod_file_paths.append("tmp/mod_files/"+image.date+".mod")
+                mod_file_paths.append("tmp/mod_files_clean/"+image.date+ "_" + "{:.1f}".format(image.freq/1e9).replace(".","_") + "GHz.mod")
 
             if fold_polarization_beams:
                 try:
                     #DIFMAP style
                     for file in files_to_stack_q:
                         image_q=ImageData(file,model_save_dir="tmp/mod_files_q/")
-                        mod_file_paths_q.append("tmp/mod_files_q/"+image_q.date+".mod")
+                        mod_file_paths_q.append("tmp/mod_files_q/" + image_q.date + "_" +"{:.1f}".format(image_q.freq/1e9).replace(".","_") + "GHz.mod")
                     if len(files_to_stack_q)==0:
                         raise Exception()
                 except:
@@ -1005,7 +1030,7 @@ class ModelFits(TabbedPanel):
                     try:
                         for file in files_to_stack_casa_clean_models:
                             image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True)
-                            mod_file_paths_q.append("tmp/mod_files_q/"+image_model.date+".mod")
+                            mod_file_paths_q.append("tmp/mod_files_q/"+image_model.date+ "_" + "{:.1f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
                     except:
                         self.show_popup("Error","Stokes Q .fits file does not contain clean model!","Continue")
                         fold_polarization_beams=False
@@ -1014,7 +1039,7 @@ class ModelFits(TabbedPanel):
                     #DIFMAP style
                     for file in files_to_stack_u:
                         image_u=ImageData(file,model_save_dir="tmp/mod_files_u/")
-                        mod_file_paths_u.append("tmp/mod_files_u/"+image_u.date+".mod")
+                        mod_file_paths_u.append("tmp/mod_files_u/"+image_u.date+ "_" + "{:.1f}".format(image_u.freq/1e9).replace(".","_") + "GHz.mod")
                     if len(files_to_stack_u)==0:
                         raise Exception()
                 except:
@@ -1022,7 +1047,7 @@ class ModelFits(TabbedPanel):
                         # TRY to import CASA clean model
                         for file in files_to_stack_casa_clean_models:
                             image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True)
-                            mod_file_paths_u.append("tmp/mod_files_u/"+image_model.date+".mod")
+                            mod_file_paths_u.append("tmp/mod_files_u/"+image_model.date+ "_" +"{:.1f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
                     except:
                         self.show_popup("Error","Stokes U .fits file does not contain clean model!","Continue")
                         fold_polarization_beams=False

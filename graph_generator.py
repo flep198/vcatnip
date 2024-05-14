@@ -13,6 +13,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from kinematics import Component
 from astropy.time import Time
 import sys
+import pexpect
 
 #optimized draw on Agg backend
 mpl.rcParams['path.simplify'] = True
@@ -49,7 +50,13 @@ class KinematicPlot(object):
 
     def plot_tbs(self,component_collection,color):
         if component_collection.length() > 0:
-            self.ax.plot(component_collection.year, component_collection.tbs, c=color, label=component_collection.name,marker=".")
+            lower_limit_inds = np.where(np.array(component_collection.tbs_lower_limit))[0]
+            tb_value_inds = np.where(np.array(component_collection.tbs_lower_limit)==False)[0]
+            self.ax.plot(np.array(component_collection.year)[tb_value_inds],
+                         np.array(component_collection.tbs)[tb_value_inds], c=color, label=component_collection.name,marker=".")
+            self.ax.scatter(np.array(component_collection.year)[lower_limit_inds],
+                            np.array(component_collection.tbs)[lower_limit_inds], c=color, marker="^")
+
         self.ax.set_xlabel('Time [year]', fontsize=font_size_axis_title)
         self.ax.set_ylabel('Brightness Temperature [K]', fontsize=font_size_axis_title)
         self.ax.set_yscale("log")
@@ -65,6 +72,7 @@ class KinematicPlot(object):
 class ImageData(object):
     def __init__(self,
                  fits_file="",
+                 uvf_file="",
                  stokes_i=[],
                  model="",
                  lin_pol=[],
@@ -72,14 +80,18 @@ class ImageData(object):
                  pol_from_stokes=True,
                  stokes_q="",
                  stokes_u="",
-                 model_save_dir="tmp/mod_files/",
-                 is_casa_model=False):
+                 model_save_dir="tmp/mod_files_model/",
+                 is_casa_model=False,
+                 difmap_path=""):
 
         self.file_path = fits_file
         self.model_file_path = model
         self.lin_pol=lin_pol
         self.evpa=evpa
         self.stokes_i=stokes_i
+        self.uvf_file=uvf_file
+        self.difmap_path=difmap_path
+        self.residual_map_path=""
 
         # Read clean files in
         if fits_file!="":
@@ -271,17 +283,16 @@ class ImageData(object):
             self.model=getComponentInfo(model)
             #write .mod file from .fits input
             os.makedirs(model_save_dir,exist_ok=True)
-            write_mod_file(self.model, model_save_dir + self.date + ".mod", freq=self.freq)
+            write_mod_file(self.model, model_save_dir + self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod", freq=self.freq)
         if is_casa_model:
             #TODO basic checks if file is valid
             os.makedirs(model_save_dir,exist_ok=True)
             os.makedirs(model_save_dir+"mod_files_clean", exist_ok=True)
             os.makedirs(model_save_dir+"mod_files_q", exist_ok=True)
             os.makedirs(model_save_dir + "mod_files_u", exist_ok=True)
-            write_mod_file_from_casa(self.file_path,channel="i", export=model_save_dir+"mod_files/"+self.date + ".mod")
-            write_mod_file_from_casa(self.file_path,channel="i", export=model_save_dir+"mod_files_clean/"+self.date + ".mod")
-            write_mod_file_from_casa(self.file_path,channel="q", export=model_save_dir+"mod_files_q/"+self.date + ".mod")
-            write_mod_file_from_casa(self.file_path,channel="u", export=model_save_dir+"mod_files_u/"+self.date + ".mod")
+            write_mod_file_from_casa(self.file_path,channel="i", export=model_save_dir+"mod_files_clean/"+self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod")
+            write_mod_file_from_casa(self.file_path,channel="q", export=model_save_dir+"mod_files_q/"+self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod")
+            write_mod_file_from_casa(self.file_path,channel="u", export=model_save_dir+"mod_files_u/"+self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod")
 
         else:
             self.model=None
@@ -293,30 +304,39 @@ class ImageData(object):
             model_i = getComponentInfo(fits_file)
             if self.model==None:
                 self.model = model_i
-            write_mod_file(model_i, "tmp/mod_files_clean/"+ self.date + ".mod", freq=self.freq)
+            write_mod_file(model_i, "tmp/mod_files_clean/"+ self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod", freq=self.freq)
             #load stokes q and u clean models
             model_q=getComponentInfo(stokes_q_path)
-            write_mod_file(model_q, "tmp/mod_files_q/" + self.date + ".mod", freq=self.freq)
+            write_mod_file(model_q, "tmp/mod_files_q/" + self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod", freq=self.freq)
             model_u=getComponentInfo(stokes_u_path)
-            write_mod_file(model_u, "tmp/mod_files_u/" + self.date + ".mod", freq=self.freq)
+            write_mod_file(model_u, "tmp/mod_files_u/" + self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod", freq=self.freq)
         except:
             pass
+
+        #calculate residual map if uvf and modelfile present
+        if self.uvf_file!="" and self.model_file_path!="" and not is_casa_model:
+            self.residual_map_path = model_save_dir + self.date + "_" + "{:.1f}".format(self.freq / 1e9).replace(".",
+                                                                                                                 "_") + "GHz_residual.fits"
+            get_residual_map(self.uvf_file,model_save_dir+ self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod",
+                             difmap_path=self.difmap_path,
+                             save_location=self.residual_map_path,npix=len(self.X),pxsize=self.degpp)
 
         hdu_list.close()
 
         #calculate cleaned flux density from mod files
         #first stokes I
         try:
-            self.integrated_flux_clean=total_flux_from_mod("tmp/mod_files_clean/" + self.date + ".mod")
+            self.integrated_flux_clean=total_flux_from_mod("tmp/mod_files_clean/" + self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod")
         except:
             self.integrated_flux_clean = 0
         #and then polarization
         try:
-            flux_q=total_flux_from_mod("tmp/mod_files_q/" + self.date + ".mod")
-            flux_u=total_flux_from_mod("tmp/mod_files_u/" + self.date + ".mod")
+            flux_q=total_flux_from_mod("tmp/mod_files_q/" + self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod")
+            flux_u=total_flux_from_mod("tmp/mod_files_u/" + self.date + "_" + "{:.1f}".format(self.freq/1e9).replace(".","_") + "GHz.mod")
             self.integrated_pol_flux_clean=np.sqrt(flux_u**2+flux_q**2)
         except:
             self.integrated_pol_flux_clean=0
+
 
 
 class FitsImage(object):
@@ -499,8 +519,14 @@ class FitsImage(object):
                 for j in range(len(g_x)):
                     # plot component
                     component_plot = self.plotComponent(g_x[j], g_y[j], g_maj[j], g_min[j], g_pos[j], scale)
+                    #calculate noise at the position of the component
+                    try:
+                        component_noise=get_noise_from_residual_map(self.clean_image.residual_map_path, g_x[j]*scale,g_y[j]*scale,np.max(X)/10,np.max(Y)/10,scale=scale)#TODO check if the /10 width works and make it changeable
+                    except:
+                        component_noise=self.clean_image.noise
                     component = Component(g_x[j], g_y[j], g_maj[j], g_min[j], g_pos[j], g_flux[j], g_date[j],
-                                          g_mjd[j], g_year[j], scale=scale, freq=self.freq)
+                                          g_mjd[j], g_year[j], scale=scale, freq=self.freq, noise=component_noise,
+                                          beam_maj=beam_maj,beam_min=beam_min,beam_pa=beam_pa)
                     self.components.append([component_plot, component])
 
         self.xmin,self.xmax = ra_min, ra_max
@@ -664,7 +690,6 @@ def getComponentInfo(filename):
     else:
         data_df = pd.concat([data_df, comp_data1_df], axis=0, ignore_index=True)
     os.makedirs("tmp",exist_ok=True)
-    os.makedirs("tmp/mod_files",exist_ok=True)
     return data_df
 
 #writes a .mod file given an input of from getComponentInfo(fitsfile)
@@ -806,3 +831,43 @@ def PXPERBEAM(b_maj,b_min,px_inc):
 
 def JyPerBeam2Jy(jpb,b_maj,b_min,px_inc):
     return jpb/PXPERBEAM(b_maj,b_min,px_inc)
+
+# calculates the image noise from the residual map in a given box area
+def get_residual_map(uvf_file,mod_file, difmap_path, save_location="residual.fits", npix=2048,pxsize=0.05):
+
+    # add difmap to PATH
+    if difmap_path != None and not difmap_path in os.environ['PATH']:
+        os.environ['PATH'] = os.environ['PATH'] + ':{0}'.format(difmap_path)
+
+    # Initialize difmap call
+    child = pexpect.spawn('difmap', encoding='utf-8', echo=False)
+    child.expect_exact("0>", None, 2)
+
+    def send_difmap_command(command, prompt="0>"):
+        child.sendline(command)
+        child.expect_exact(prompt, None, 2)
+
+    send_difmap_command("obs "+uvf_file)
+    send_difmap_command("select i")
+    send_difmap_command("uvw 0,-1")  # use natural weighting
+    send_difmap_command("rmod "+mod_file)
+    send_difmap_command("maps " + str(npix) + "," + str(pxsize))
+    send_difmap_command("wdmap " + save_location) #save the residual map to a fits file
+
+    os.system("rm -rf difmap.log*")
+
+def get_noise_from_residual_map(residual_fits, center_x, center_y, x_width, y_width,scale=0):
+    residual_map = ImageData(residual_fits)
+    data=residual_map.Z
+
+    x_max=np.argmin(abs(residual_map.X*scale-(center_x-x_width/2)))
+    y_min=np.argmin(abs(residual_map.Y*scale-(center_y-y_width/2)))
+    x_min=np.argmin(abs(residual_map.X*scale-(center_x+x_width/2)))
+    y_max=np.argmin(abs(residual_map.Y*scale-(center_y+y_width/2)))
+
+    return np.average(data[x_min:x_max,y_min:y_max]) #TODO check order of x/y here and if AVERAGE is the correct thing to do!!!
+
+
+
+
+

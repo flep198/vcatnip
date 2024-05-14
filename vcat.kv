@@ -204,6 +204,22 @@
             Label:
                 text: ''
                 size_hint_x: 0.2
+            Label:
+                text: ''
+                size_hint_x: 1
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: "DIFMAP location"
+                size_hint_x: 0.2
+            TextInput:
+                text:'/usr/local/difmap/uvf_difmap_2.5g'
+                id: difmap_path
+                size_hint_x:0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
     TabbedPanelItem:
         text: 'Kinematics'
         background_color: (1, .5, 0, 1)
@@ -449,14 +465,6 @@
                     Label:
                         text: "Stacking Settings"
                         size_hint_y:0.1
-                    BoxLayout:
-                        size_hint_y:0.05
-                        orientation: "horizontal"
-                        Label:
-                            text: "DIFMAP location"
-                        TextInput:
-                            text:'/usr/local/difmap/uvf_difmap_2.5g'
-                            id: difmap_path
                     BoxLayout:
                         size_hint_y:0.05
                     BoxLayout:

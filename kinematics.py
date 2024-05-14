@@ -3,11 +3,13 @@ from astropy.cosmology import FlatLambdaCDM
 from astropy import constants as const
 from astropy import units as u
 import pandas as pd
+from sympy import Ellipse, Point, Line
 
 
 class Component():
     def __init__(self, x, y, maj, min, pos, flux, date, mjd, year, delta_x_est=0, delta_y_est=0,
-                 component_number=-1, is_core=False, redshift=0, scale=60 * 60 * 10 ** 3,freq=15e9):
+                 component_number=-1, is_core=False, redshift=0, scale=60 * 60 * 10 ** 3,freq=15e9,noise=0,
+                 beam_maj=0, beam_min=0, beam_pa=0):
         self.x = x
         self.y = y
         self.mjd = mjd
@@ -19,12 +21,32 @@ class Component():
         self.year = year
         self.component_number = component_number
         self.is_core = is_core
+        self.noise = noise #image noise at the position of the component
+        self.beam_maj = beam_maj
+        self.beam_min = beam_min
+        self.beam_pa = beam_pa
         self.delta_x_est = self.x
         self.delta_y_est = self.y
         self.distance_to_core = np.sqrt(self.delta_x_est ** 2 + self.delta_y_est ** 2)
         self.redshift = redshift
         self.freq=freq
-        self.tb = 1.22e12/(self.freq*1e-9)**2 * self.flux * (1 + self.redshift) / self.maj / self.min /(scale)**2  #Kovalev et al. 2005
+        if noise==0:
+            self.res_lim_min=0
+            self.res_lim_maj=0
+        else:
+            self.res_lim_maj, self.res_lim_min=get_resolution_limit(beam_maj,beam_min,beam_pa,pos,flux,noise) #Kovalev et al. 2005
+
+
+        #check if component is resolved or not:
+        if (self.res_lim_min>self.min*scale) or (self.res_lim_maj>self.maj*scale):
+            self.tb_lower_limit=True
+        else:
+            self.tb_lower_limit=False
+
+        maj_for_tb=np.max(np.array([self.res_lim_maj,self.maj*scale]))
+        min_for_tb=np.max(np.array([self.res_lim_min,self.min*scale]))
+
+        self.tb = 1.22e12/(self.freq*1e-9)**2 * self.flux * (1 + self.redshift) / maj_for_tb / min_for_tb   #Kovalev et al. 2005
         self.scale = scale
 
     def set_distance_to_core(self, core_x, core_y):
@@ -62,6 +84,7 @@ class ComponentCollection():
         self.ys = []
         self.fluxs = []
         self.tbs = []
+        self.tbs_lower_limit= []
 
         for comp in components:
             self.year.append(comp.year)
@@ -71,6 +94,7 @@ class ComponentCollection():
             self.ys.append(comp.delta_y_est)
             self.fluxs.append(comp.flux)
             self.tbs.append(comp.tb)
+            self.tbs_lower_limit.append(comp.tb_lower_limit)
 
     def length(self):
         return len(self.components)
@@ -125,3 +149,24 @@ class ComponentCollection():
         return {"name": self.name, "speed": float(speed), "speed_err": float(speed_err), "y0": y0, "y0_err": y0_err,
                 "beta_app": float(beta_app), "beta_app_err": float(beta_app_err), "d_crit": float(d_crit), "d_crit_err": float(d_crit_err),
                 "dist_0_est": dist_0_est, "t_0": t_0, "t_0_err": t_0_err, "red_chi_sqr": red_chi_sqr}
+
+def get_resolution_limit(beam_maj,beam_min,beam_pos,comp_pos,flux,noise):
+    # TODO check the resolution limits, if they make sense and are reasonable (it looks okay though...)!!!!
+    #here we need to check if the component is resolved or not!
+    factor=np.sqrt(4*np.log(2)/np.pi)*np.log(flux/noise/(flux/noise-1)) #following Kovalev et al. 2005
+
+    #rotate the beam to the x-axis
+    new_pos=beam_pos-comp_pos
+
+    #TODO double check the angles and check that new_pos and pos are both in degree!
+    #We use SymPy to intersect the beam with the component maj/min directions
+    beam=Ellipse(Point(0,0),hradius=beam_maj/2,vradius=beam_min/2)
+    line_maj=Line(Point(0,0),Point(np.cos(new_pos/180*np.pi),np.sin(new_pos/180*np.pi)))
+    line_min=Line(Point(0,0),Point(np.cos((new_pos+90)/180*np.pi),np.sin((new_pos+90)/180*np.pi)))
+    p1,p2=beam.intersect(line_maj)
+    b_phi_maj=float(p1.distance(p2)) #as in Kovalev et al. 2005
+    p1,p2=beam.intersect(line_min)
+    b_phi_min=float(p1.distance(p2)) #as in Kovalev et al. 2005
+    theta_min = b_phi_min*factor
+    theta_maj = b_phi_maj*factor
+    return theta_maj,theta_min
