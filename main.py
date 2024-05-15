@@ -234,7 +234,7 @@ class ModelFits(TabbedPanel):
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
             if warn_uvf:
                 self.show_popup("Warning",
-                                "No .uvf files loaded, will not be able to calculate upper limits for TB!",
+                                "No .uvf files loaded, will not be able to calculate good upper limits for TB!",
                                 "Continue")
         elif len(self.clean_filepaths) == 0 and len(self.modelfit_filepaths)>0:
             # create plots for view page
@@ -1077,8 +1077,8 @@ class ModelFits(TabbedPanel):
                                pixel_size=degpp / 2, mod_files=mod_file_paths_q,
                                uvf_files=files_to_stack_uvf)
                 for i in range(len(files_to_stack)):
-                    files_to_stack_q.append("tmp/restored_fits_q/"+".".join(
-                        files_to_stack[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits")
+                    files_to_stack_q[i]="tmp/restored_fits_q/"+".".join(
+                        files_to_stack_q[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits"
 
                 #Restore Stokes U
                 fold_with_beam(files_to_stack, #input stokes I files here here to use the common beam from Stokes I!
@@ -1088,8 +1088,8 @@ class ModelFits(TabbedPanel):
                                pixel_size=degpp / 2, use_common_beam=True, mod_files=mod_file_paths_u,
                                uvf_files=files_to_stack_uvf)
                 for i in range(len(files_to_stack)):
-                    files_to_stack_u.append("tmp/restored_fits_u/"+".".join(
-                        files_to_stack[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits")
+                    files_to_stack_u[i]="tmp/restored_fits_u/"+".".join(
+                        files_to_stack_u[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits"
 
             #change file names:
             for i in range(len(files_to_stack)):

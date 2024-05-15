@@ -30,18 +30,34 @@ class Component():
         self.distance_to_core = np.sqrt(self.delta_x_est ** 2 + self.delta_y_est ** 2)
         self.redshift = redshift
         self.freq=freq
+        is_circular=False
         if noise==0:
             self.res_lim_min=0
             self.res_lim_maj=0
         else:
-            self.res_lim_maj, self.res_lim_min=get_resolution_limit(beam_maj,beam_min,beam_pa,pos,flux,noise) #Kovalev et al. 2005
+            #check for circular components:
+            if self.maj == self.min:
+                self.res_lim_maj, dummy = get_resolution_limit(beam_maj,beam_min,beam_pa,beam_pa,flux,noise)
+                self.res_lim_min=self.res_lim_maj
+                is_circular=True
+            else:
+                self.res_lim_maj, self.res_lim_min=get_resolution_limit(beam_maj,beam_min,beam_pa,pos,flux,noise) #Kovalev et al. 2005
+
 
 
         #check if component is resolved or not:
         if (self.res_lim_min>self.min*scale) or (self.res_lim_maj>self.maj*scale):
+            if is_circular:
+                maj_for_tb = self.res_lim_maj
+                min_for_tb = self.res_lim_maj
+            else:
+                maj_for_tb = np.max(np.array([self.res_lim_maj, self.maj * scale]))
+                min_for_tb = np.max(np.array([self.res_lim_min, self.min * scale]))
             self.tb_lower_limit=True
         else:
             self.tb_lower_limit=False
+            maj_for_tb = self.maj * scale
+            min_for_tb = self.min * scale
 
         maj_for_tb=np.max(np.array([self.res_lim_maj,self.maj*scale]))
         min_for_tb=np.max(np.array([self.res_lim_min,self.min*scale]))
@@ -153,7 +169,7 @@ class ComponentCollection():
 def get_resolution_limit(beam_maj,beam_min,beam_pos,comp_pos,flux,noise):
     # TODO check the resolution limits, if they make sense and are reasonable (it looks okay though...)!!!!
     #here we need to check if the component is resolved or not!
-    factor=np.sqrt(4*np.log(2)/np.pi)*np.log(flux/noise/(flux/noise-1)) #following Kovalev et al. 2005
+    factor=np.sqrt(4*np.log(2)/np.pi*np.log(flux/noise/(flux/noise-1))) #following Kovalev et al. 2005
 
     #rotate the beam to the x-axis
     new_pos=beam_pos-comp_pos

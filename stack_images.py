@@ -168,13 +168,14 @@ def stack_fits(fits_files, #a list of filepaths to fits files (either full polar
         if file[0].data.shape[0]==1:
             only_stokes_i=True
 
+
  
     if wrong_len:
         raise Exception("Error! Please put in more than one fits file, otherwise stacking makes no sense!")
     elif not_stokes:
         raise Exception("Error! Your fits-files are not in STOKES format. This is currently not implemented!")
     else:
-        
+        print(len(stokes_q_fits),len(stokes_u_fits),len(fits_files))
         if only_stokes_i and (len(stokes_q_fits)!=len(fits_files) or len(stokes_u_fits)!=len(fits_files)):
             print("Warning! Only Stokes I input given!")
             print("-> will produce only Stokes I stacked image")
