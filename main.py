@@ -54,7 +54,7 @@ class ModelFits(TabbedPanel):
     plots = []
     components = []
     active_component_ind=None
-    component_colors=["green","red","blue","yellow","orange","purple"]
+    component_colors=["#ef476f","#ffd166","#06d6a0","#118ab2","#073b4c"]
     figure_widgets=[]
     core_component_ind=None
     name=""
@@ -90,8 +90,6 @@ class ModelFits(TabbedPanel):
             date=[]
 
             for filepath in fits_files:
-                plot_data=ImageData(filepath)
-                plot=FitsImage(plot_data)
                 date=np.append(date,get_date(filepath))
 
             args = date.argsort()
@@ -114,8 +112,12 @@ class ModelFits(TabbedPanel):
 
     def load_uvf(self,selection):
         self.plots = []
+
+        #try attaching the new files to previous ones
+        combined = selection + self.uvf_filepaths
         # sort by date
-        self.uvf_filepaths = self.sort_uvf_by_date(selection)
+        self.uvf_filepaths = self.sort_uvf_by_date(combined)
+
         try:
             self.the_popup.dismiss()
         except:
@@ -125,8 +127,12 @@ class ModelFits(TabbedPanel):
 
     def load_modelfit(self, selection):
         self.plots=[]
+
+        # try attaching the new files to previous ones
+        combined = selection + self.modelfit_filepaths
+
         # sort by date
-        self.modelfit_filepaths = self.sort_fits_by_date(selection)
+        self.modelfit_filepaths = self.sort_fits_by_date(combined)
         try:
             self.the_popup.dismiss()
         except:
@@ -136,7 +142,11 @@ class ModelFits(TabbedPanel):
 
     def load_clean(self, selection):
         self.plots=[]
-        self.clean_filepaths = self.sort_fits_by_date(selection)
+
+        # try attaching the new files to previous ones
+        combined = selection + self.clean_filepaths
+
+        self.clean_filepaths = self.sort_fits_by_date(combined)
         try:
             self.the_popup.dismiss()
         except:
@@ -146,7 +156,11 @@ class ModelFits(TabbedPanel):
 
     def load_stokes_q(self, selection):
         self.plots=[]
-        self.stokes_q_filepaths = self.sort_fits_by_date(selection)
+
+        # try attaching the new files to previous ones
+        combined = selection + self.stokes_q_filepaths
+
+        self.stokes_q_filepaths = self.sort_fits_by_date(combined)
         try:
             self.the_popup.dismiss()
         except:
@@ -156,7 +170,11 @@ class ModelFits(TabbedPanel):
 
     def load_stokes_u(self, selection):
         self.plots=[]
-        self.stokes_u_filepaths = self.sort_fits_by_date(selection)
+
+        # try attaching the new files to previous ones
+        combined = selection + self.stokes_u_filepaths
+
+        self.stokes_u_filepaths = self.sort_fits_by_date(combined)
         try:
             self.the_popup.dismiss()
         except:
@@ -166,7 +184,12 @@ class ModelFits(TabbedPanel):
 
     def load_casa_clean_model(self,selection):
         self.plots=[]
-        self.casa_clean_model_filepaths = self.sort_fits_by_date(selection)
+        print(selection)
+        # try attaching the new files to previous ones
+        combined = selection + self.casa_clean_model_filepaths
+
+        print(selection)
+        self.casa_clean_model_filepaths = self.sort_fits_by_date(combined)
         try:
             self.the_popup.dismiss()
         except:
@@ -260,7 +283,7 @@ class ModelFits(TabbedPanel):
 
         frequencies=[]
         for plot in fits_images:
-            frequency="{:.1f}".format(plot.freq/1e9)+" GHz"
+            frequency="{:.0f}".format(plot.freq/1e9)+" GHz"
             if not frequency in frequencies:
                 frequencies.append(frequency)
             self.plots.append(plot)
@@ -304,7 +327,7 @@ class ModelFits(TabbedPanel):
         #add back only the ones that are selected
         for ind,plot in enumerate(self.plots):
             for button in self.ids.scroll_frequency_select_buttons.children:
-                if "{:.1f}".format(plot.freq/1e9)+" GHz" == button.text:
+                if "{:.0f}".format(plot.freq/1e9)+" GHz" == button.text:
                     if button.state=="down":
                         self.ids.figures.add_widget(self.figure_widgets[ind])
                     else:
@@ -552,7 +575,7 @@ class ModelFits(TabbedPanel):
             #first find available frequencies
             frequencies=[]
             for plot in plots_to_fit:
-                plot_freq="{:.1f}".format(plot.freq/1e9)
+                plot_freq="{:.0f}".format(plot.freq/1e9)
                 if plot_freq not in frequencies:
                     frequencies.append(plot_freq)
 
@@ -563,7 +586,7 @@ class ModelFits(TabbedPanel):
                 for frequency_to_plot in frequencies:
                     collection = []
                     for plot in plots_to_fit:
-                        if "{:.1f}".format(plot.freq/1e9) == frequency_to_plot:
+                        if "{:.0f}".format(plot.freq/1e9) == frequency_to_plot:
                             for comp in plot.components:
                                 if comp[1].component_number == i:
                                     # determine plot limits
@@ -637,7 +660,7 @@ class ModelFits(TabbedPanel):
             frequency_to_plot = frequency_button.text
             plots_to_fit = []
             for plot in self.plots:
-                if "{:.1f}".format(plot.freq / 1e9) + " GHz" == frequency_to_plot:
+                if "{:.0f}".format(plot.freq / 1e9) + " GHz" == frequency_to_plot:
                     plots_to_fit.append(plot)
         else:
             plots_to_fit = self.plots
@@ -744,6 +767,7 @@ class ModelFits(TabbedPanel):
 
     #used to save/export the kinematic results, writes a directory which includes two .csv files for the component info
     #and a sub-folder /fits with the fits files, and pdf and png files for the plots
+    #TODO make it work for multifrequency and core-shift plots
     def save_kinematics(self,save_text,selection):
         save_path=str(selection[0])
 
@@ -786,30 +810,52 @@ class ModelFits(TabbedPanel):
         kinematic_button = self.ids.kinematic_choose
         flux_button = self.ids.flux_choose
         tb_button = self.ids.tb_choose
+        core_shift_choose = self.ids.core_shift_choose
 
         k_state_initial=kinematic_button.state
         f_state_initial=flux_button.state
         t_state_initial=tb_button.state
+        core_shift_state_initial=core_shift_choose.state
 
-        kinematic_button.state = 'down'
-        flux_button.state = 'normal'
-        tb_button.state = 'normal'
-        self.update_kinematic_plot(do_export=True,export_path=save_path+"/kinematic_plot")
+        for frequency_btn in ToggleButton.get_widgets('plot_frequency_select'):
+
+            frequency_btn.state="down"
+            for frequency_btn2 in ToggleButton.get_widgets('plot_frequency_select'):
+                if frequency_btn!=frequency_btn2:
+                    frequency_btn2.state="normal"
+
+            freq=frequency_btn.text.replace(" ","")
+            kinematic_button.state = 'down'
+            flux_button.state = 'normal'
+            tb_button.state = 'normal'
+            core_shift_choose.state = 'normal'
+            self.update_kinematic_plot(do_export=True,export_path=save_path+"/kinematic_plot_"+freq)
+
+            kinematic_button.state = 'normal'
+            flux_button.state = 'down'
+            tb_button.state = 'normal'
+            core_shift_choose.state = 'normal'
+            self.update_kinematic_plot(do_export=True, export_path=save_path + "/flux_density_plot_"+freq)
+
+            kinematic_button.state = 'normal'
+            flux_button.state = 'normal'
+            tb_button.state = 'down'
+            core_shift_choose.state = 'normal'
+            self.update_kinematic_plot(do_export=True, export_path=save_path + "/tb_plot_"+freq)
+
+            frequency_btn.state="normal"
 
         kinematic_button.state = 'normal'
-        flux_button.state = 'down'
-        tb_button.state = 'normal'
-        self.update_kinematic_plot(do_export=True, export_path=save_path + "/flux_density_plot")
-
-        kinematic_button.state = 'normal'
         flux_button.state = 'normal'
-        tb_button.state = 'down'
-        self.update_kinematic_plot(do_export=True, export_path=save_path + "/tb_plot")
+        tb_button.state = 'normal'
+        core_shift_choose.state = 'down'
+        self.update_kinematic_plot(do_export=True, export_path=save_path + "/core_shift")
 
         #reset buttons to initial state
         kinematic_button.state = k_state_initial
         flux_button.state = f_state_initial
         tb_button.state = t_state_initial
+        core_shift_choose.state = core_shift_state_initial
         self.update_kinematic_plot()
 
         self.show_popup("Export Info","Export successful to \n" + save_path,"Continue")
@@ -1014,23 +1060,23 @@ class ModelFits(TabbedPanel):
                     image=ImageData(files_to_stack[i],model=files_to_stack_models[i])
                 else:
                     image=ImageData(files_to_stack[i])
-                mod_file_paths.append("tmp/mod_files_clean/"+image.date+ "_" + "{:.1f}".format(image.freq/1e9).replace(".","_") + "GHz.mod")
+                mod_file_paths.append("tmp/mod_files_clean/"+image.date+ "_" + "{:.0f}".format(image.freq/1e9).replace(".","_") + "GHz.mod")
 
             if fold_polarization_beams:
                 try:
                     #DIFMAP style
                     for file in files_to_stack_q:
                         image_q=ImageData(file,model_save_dir="tmp/mod_files_q/")
-                        mod_file_paths_q.append("tmp/mod_files_q/" + image_q.date + "_" +"{:.1f}".format(image_q.freq/1e9).replace(".","_") + "GHz.mod")
+                        mod_file_paths_q.append("tmp/mod_files_q/" + image_q.date + "_" +"{:.0f}".format(image_q.freq/1e9).replace(".","_") + "GHz.mod")
                     if len(files_to_stack_q)==0:
                         raise Exception()
                 except:
-
                     # TRY to import CASA clean model
                     try:
                         for file in files_to_stack_casa_clean_models:
                             image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True)
-                            mod_file_paths_q.append("tmp/mod_files_q/"+image_model.date+ "_" + "{:.1f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
+                            mod_file_paths_q.append("tmp/mod_files_q/"+image_model.date+ "_" + "{:.0f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
+                            files_to_stack_q.append(file)
                     except:
                         self.show_popup("Error","Stokes Q .fits file does not contain clean model!","Continue")
                         fold_polarization_beams=False
@@ -1039,7 +1085,7 @@ class ModelFits(TabbedPanel):
                     #DIFMAP style
                     for file in files_to_stack_u:
                         image_u=ImageData(file,model_save_dir="tmp/mod_files_u/")
-                        mod_file_paths_u.append("tmp/mod_files_u/"+image_u.date+ "_" + "{:.1f}".format(image_u.freq/1e9).replace(".","_") + "GHz.mod")
+                        mod_file_paths_u.append("tmp/mod_files_u/"+image_u.date+ "_" + "{:.0f}".format(image_u.freq/1e9).replace(".","_") + "GHz.mod")
                     if len(files_to_stack_u)==0:
                         raise Exception()
                 except:
@@ -1047,7 +1093,8 @@ class ModelFits(TabbedPanel):
                         # TRY to import CASA clean model
                         for file in files_to_stack_casa_clean_models:
                             image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True)
-                            mod_file_paths_u.append("tmp/mod_files_u/"+image_model.date+ "_" +"{:.1f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
+                            mod_file_paths_u.append("tmp/mod_files_u/"+image_model.date+ "_" +"{:.0f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
+                            files_to_stack_u.append(file)
                     except:
                         self.show_popup("Error","Stokes U .fits file does not contain clean model!","Continue")
                         fold_polarization_beams=False
@@ -1078,7 +1125,7 @@ class ModelFits(TabbedPanel):
                                uvf_files=files_to_stack_uvf)
                 for i in range(len(files_to_stack)):
                     files_to_stack_q[i]="tmp/restored_fits_q/"+".".join(
-                        files_to_stack_q[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits"
+                        files_to_stack[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits"
 
                 #Restore Stokes U
                 fold_with_beam(files_to_stack, #input stokes I files here here to use the common beam from Stokes I!
@@ -1089,7 +1136,7 @@ class ModelFits(TabbedPanel):
                                uvf_files=files_to_stack_uvf)
                 for i in range(len(files_to_stack)):
                     files_to_stack_u[i]="tmp/restored_fits_u/"+".".join(
-                        files_to_stack_u[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits"
+                        files_to_stack[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits"
 
             #change file names:
             for i in range(len(files_to_stack)):
