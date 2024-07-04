@@ -103,6 +103,16 @@
             height: 30
             spacing: 5
             Label:
+                text: ''
+                size_hint_x: 0.2
+            Button:
+                text: 'Reset'
+                size_hint_x: 0.6
+                on_press: root.reset_input_files()
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
                 text: 'UV-Fits files (.uvf files)'
                 size_hint_x: 1
             Label:

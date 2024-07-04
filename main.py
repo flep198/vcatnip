@@ -111,7 +111,6 @@ class ModelFits(TabbedPanel):
     #### START OF IMPORT FUNCTIONS
 
     def load_uvf(self,selection):
-        self.plots = []
 
         #try attaching the new files to previous ones
         combined = selection + self.uvf_filepaths
@@ -126,7 +125,6 @@ class ModelFits(TabbedPanel):
         self.ids.get_file_uvf.text = self.file_info
 
     def load_modelfit(self, selection):
-        self.plots=[]
 
         # try attaching the new files to previous ones
         combined = selection + self.modelfit_filepaths
@@ -141,7 +139,6 @@ class ModelFits(TabbedPanel):
         self.ids.get_file_modelfit.text = self.file_info
 
     def load_clean(self, selection):
-        self.plots=[]
 
         # try attaching the new files to previous ones
         combined = selection + self.clean_filepaths
@@ -155,7 +152,6 @@ class ModelFits(TabbedPanel):
         self.ids.get_file_clean.text = self.file_info
 
     def load_stokes_q(self, selection):
-        self.plots=[]
 
         # try attaching the new files to previous ones
         combined = selection + self.stokes_q_filepaths
@@ -169,7 +165,6 @@ class ModelFits(TabbedPanel):
         self.ids.get_file_stokes_q.text = self.file_info
 
     def load_stokes_u(self, selection):
-        self.plots=[]
 
         # try attaching the new files to previous ones
         combined = selection + self.stokes_u_filepaths
@@ -183,12 +178,10 @@ class ModelFits(TabbedPanel):
         self.ids.get_file_stokes_u.text = self.file_info
 
     def load_casa_clean_model(self,selection):
-        self.plots=[]
-        print(selection)
+
         # try attaching the new files to previous ones
         combined = selection + self.casa_clean_model_filepaths
 
-        print(selection)
         self.casa_clean_model_filepaths = self.sort_fits_by_date(combined)
         try:
             self.the_popup.dismiss()
@@ -197,6 +190,23 @@ class ModelFits(TabbedPanel):
         self.file_info = str(len(self.casa_clean_model_filepaths)) + " Files selected"
         self.ids.get_file_casa_clean_model.text = self.file_info
 
+    def reset_input_files(self):
+
+        #reset file arrays
+        self.casa_clean_model_filepaths=[]
+        self.stokes_u_filepaths=[]
+        self.stokes_q_filepaths=[]
+        self.clean_filepaths=[]
+        self.modelfit_filepaths=[]
+        self.uvf_filepaths=[]
+
+        #reset text in field
+        self.ids.get_file_casa_clean_model.text=""
+        self.ids.get_file_stokes_u.text=""
+        self.ids.get_file_stokes_q.text=""
+        self.ids.get_file_clean.text=""
+        self.ids.get_file_modelfit.text=""
+        self.ids.get_file_uvf.text=""
 
     #### END OF IMPORT FUNCTIONS
 
@@ -233,25 +243,55 @@ class ModelFits(TabbedPanel):
             return None
 
     def create_kinematic_plots(self):
-        #TODO sort files by date?
-        date=[]
-        fits_images=[]
 
-        if len(self.clean_filepaths)!=len(self.modelfit_filepaths) and len(self.clean_filepaths)>0:
+        fits_images=[]
+        sort_inds=[]
+        #fits images to plot
+        modelfit_files_to_plot=[]
+        clean_files_to_plot=[]
+        uvf_files_to_plot=[]
+
+        #get already used modelfit files:
+        already_used_fits=[]
+        for plot in self.plots:
+            already_used_fits.append(plot.model_image_file)
+        for ind, file_path in enumerate(self.modelfit_filepaths):
+            if file_path in already_used_fits:
+                #in this case the file is already plotted
+                pass
+            else:
+                #in this case we need to add the plot for the file
+                modelfit_files_to_plot.append(file_path)
+                sort_inds.append(ind)
+
+                #try also attaching the clean files if they exist
+                try:
+                    clean_files_to_plot.append(self.clean_filepaths[ind])
+                except:
+                    pass
+
+                # try also attaching the uvf files if they exist
+                try:
+                    uvf_files_to_plot.append(self.uvf_filepaths[ind])
+                except:
+                    pass
+
+        if len(clean_files_to_plot)!=len(modelfit_files_to_plot) and len(clean_files_to_plot)>0:
             self.show_popup("Warning","Please use an equal number of modelfit and clean images","Continue")
-            self.modelfit_filepaths=[]
-            self.clean_filepaths=[]
-        elif len(self.clean_filepaths) == 0 and len(self.modelfit_filepaths) == 0:
+
+        elif len(clean_files_to_plot) == 0 and len(modelfit_files_to_plot) == 0:
             self.show_popup("Warning", "No data selected", "Continue")
-        elif len(self.clean_filepaths) == len(self.modelfit_filepaths):
+        #check if clean maps AND modelfits were provided
+        elif len(clean_files_to_plot) == len(modelfit_files_to_plot):
             warn_uvf=False
             #create plots for view page
-            for ind,filepath in enumerate(self.modelfit_filepaths):
-                if not len(self.uvf_filepaths) == len(self.modelfit_filepaths):
-                    plot_data=ImageData(self.clean_filepaths[ind],model=filepath)
+            for ind,filepath in enumerate(modelfit_files_to_plot):
+                if not len(uvf_files_to_plot) == len(modelfit_files_to_plot):
+                    plot_data=ImageData(clean_files_to_plot[ind],model=filepath)
+                    plot_data=ImageData(clean_files_to_plot[ind],model=filepath)
                     warn_uvf=True
                 else:
-                    plot_data = ImageData(self.clean_filepaths[ind], model=filepath, uvf_file=self.uvf_filepaths[ind],difmap_path=self.ids.difmap_path.text)
+                    plot_data = ImageData(clean_files_to_plot[ind], model=filepath, uvf_file=uvf_files_to_plot[ind],difmap_path=self.ids.difmap_path.text)
                 plot=FitsImage(plot_data,overplot_gauss=True)
                 fits_images=np.append(fits_images,plot)
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
@@ -259,15 +299,16 @@ class ModelFits(TabbedPanel):
                 self.show_popup("Warning",
                                 "No .uvf files loaded, will not be able to calculate good upper limits for TB!",
                                 "Continue")
-        elif len(self.clean_filepaths) == 0 and len(self.modelfit_filepaths)>0:
+        #otherwise check if no clean maps were provided and only modelfit maps
+        elif len(clean_files_to_plot) == 0 and len(modelfit_files_to_plot)>0:
             # create plots for view page
             warn_uvf=False
-            for ind,filepath in enumerate(self.modelfit_filepaths):
-                if not len(self.uvf_filepaths) == len(self.modelfit_filepaths):
+            for ind,filepath in enumerate(modelfit_files_to_plot):
+                if not len(uvf_files_to_plot) == len(modelfit_files_to_plot):
                     plot_data = ImageData(filepath,model=filepath)
                     warn_uvf=True
                 else:
-                    plot_data = ImageData(filepath, model=filepath, uvf_file=self.uvf_filepaths[ind],difmap_path=self.ids.difmap_path.text)
+                    plot_data = ImageData(filepath, model=filepath, uvf_file=uvf_files_to_plot[ind],difmap_path=self.ids.difmap_path.text)
                 plot = FitsImage(plot_data,overplot_gauss=True)
                 fits_images = np.append(fits_images, plot)
             self.show_popup("Warning",
@@ -277,25 +318,38 @@ class ModelFits(TabbedPanel):
                 self.show_popup("Warning",
                                 "No .uvf files loaded, will not be able to calculate upper limits for TB!",
                                 "Continue")
-        elif len(self.clean_filepaths) > 0 and len(self.modelfit_filepaths) ==0:
+        elif len(clean_files_to_plot) > 0 and len(modelfit_files_to_plot) ==0:
             self.show_popup("Warning","No modelfits imported","Continue")
 
+        #remove all existing figures to later add them again together with the new ones
+        for figure in self.figure_widgets:
+            self.ids.figures.remove_widget(figure)
 
-        frequencies=[]
-        for plot in fits_images:
+        frequencies_old = []
+        #find frequencies that are already plotted
+        for plot in self.plots:
             frequency="{:.0f}".format(plot.freq/1e9)+" GHz"
-            if not frequency in frequencies:
+            if frequency not in frequencies_old:
+                frequencies_old.append(frequency)
+
+        frequencies = []
+        for ind,plot in enumerate(fits_images):
+            frequency="{:.0f}".format(plot.freq/1e9)+" GHz"
+            if not frequency in frequencies and not frequency in frequencies_old:
                 frequencies.append(frequency)
-            self.plots.append(plot)
+            self.plots.insert(sort_inds[ind],plot)
             self.name=plot.name
             new_figure=MatplotFigure(size_hint_x=None,
             width=100)
             new_figure.figure=plot.fig
             new_figure.touch_mode="pan"
-            self.ids.figures.add_widget(new_figure)
-            self.figure_widgets.append(new_figure)
+            self.figure_widgets.insert(sort_inds[ind],new_figure)
 
-        #create frequency toggle switches if multiple frequencies were imported
+        #add widgets again together with new ones
+        for new_figure in self.figure_widgets:
+            self.ids.figures.add_widget(new_figure)
+
+        #create frequency toggle switches if multiple frequencies were imported #TODO fix it if new freqs are added
         for ind,frequency in enumerate(frequencies):
 
             #add buttons for the final kinematic plot to switch between frequencies
@@ -332,8 +386,6 @@ class ModelFits(TabbedPanel):
                         self.ids.figures.add_widget(self.figure_widgets[ind])
                     else:
                         self.ids.figures.remove_widget(self.figure_widgets[ind])
-
-
 
     def change_plot_lims(self):
         #try since the text might be no numbers
