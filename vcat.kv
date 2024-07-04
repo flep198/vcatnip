@@ -237,11 +237,20 @@
         BoxLayout:
             id: main_box
             orientation: 'vertical'
-            Button:
-                text: 'Load Files'
-                size_hint_x: 0.2
+            BoxLayout:
+                orientation: "horizontal"
                 size_hint_y: 0.05
-                on_release: root.create_kinematic_plots()
+                Button:
+                    text: 'Load Files'
+                    size_hint_x: 0.2
+                    on_release: root.create_kinematic_plots()
+                Button:
+                    text: 'Reset'
+                    size_hint_x: 0.2
+                    on_release: root.reset_kinematics()
+                Label:
+                    text: ""
+                    size_hint_x: 0.6
             BoxLayout:
                 orientation: 'horizontal'
                 padding: 50
@@ -368,6 +377,17 @@
                             on_release:
                                 app.set_touch_mode('pointselect')
                                 self.state='down'
+                    BoxLayout:
+                        size_hint_y: 0.1
+                        Button:
+                            text:"Reload Image"
+                            size_hint_x: 0.6
+                            on_release: root.refresh_plot()
+                        TextInput:
+                            size_hint_x: 0.3
+                            id: refresh_plot_ind
+                            text: ""
+
                     BoxLayout:
                         size_hint_y: 0.1
                         id: scroll_frequency_select_buttons
@@ -973,7 +993,6 @@
                         TextInput:
                             id: lin_pol_sigma_cut
                             text: "3"
-
 
 
 

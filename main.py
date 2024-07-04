@@ -288,7 +288,6 @@ class ModelFits(TabbedPanel):
             for ind,filepath in enumerate(modelfit_files_to_plot):
                 if not len(uvf_files_to_plot) == len(modelfit_files_to_plot):
                     plot_data=ImageData(clean_files_to_plot[ind],model=filepath)
-                    plot_data=ImageData(clean_files_to_plot[ind],model=filepath)
                     warn_uvf=True
                 else:
                     plot_data = ImageData(clean_files_to_plot[ind], model=filepath, uvf_file=uvf_files_to_plot[ind],difmap_path=self.ids.difmap_path.text)
@@ -339,17 +338,17 @@ class ModelFits(TabbedPanel):
                 frequencies.append(frequency)
             self.plots.insert(sort_inds[ind],plot)
             self.name=plot.name
-            new_figure=MatplotFigure(size_hint_x=None,
-            width=100)
-            new_figure.figure=plot.fig
-            new_figure.touch_mode="pan"
+            new_figure = MatplotFigure(size_hint_x=None,
+                                       width=100)
+            new_figure.figure = plot.fig
+            new_figure.touch_mode = "pan"
             self.figure_widgets.insert(sort_inds[ind],new_figure)
 
         #add widgets again together with new ones
         for new_figure in self.figure_widgets:
             self.ids.figures.add_widget(new_figure)
 
-        #create frequency toggle switches if multiple frequencies were imported #TODO fix it if new freqs are added
+        #create frequency toggle switches if multiple frequencies were imported
         for ind,frequency in enumerate(frequencies):
 
             #add buttons for the final kinematic plot to switch between frequencies
@@ -371,6 +370,48 @@ class ModelFits(TabbedPanel):
             )
             button.bind(on_release=self.update_scroll_plots)
             self.ids.scroll_frequency_select_buttons.add_widget(button)
+
+    def refresh_plot(self):
+
+        try:
+            ind=int(self.ids.refresh_plot_ind.text)
+
+            #create new ImageData object
+            try:
+                plot_data=ImageData(self.clean_filepaths[ind], model=self.modelfit_filepaths[ind], uvf_file=self.uvf_filepaths[ind],
+                          difmap_path=self.ids.difmap_path.text)
+            except:
+                try:
+                    plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],uvf_file=self.uvf_filepaths[ind])
+                except:
+                    try:
+                        plot_data=ImageData(self.clean_filepaths[ind],model=self.modelfit_filepaths[ind])
+                    except:
+                        plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind])
+
+            plot = FitsImage(plot_data, overplot_gauss=True)
+            #create Figure
+            new_figure = MatplotFigure(size_hint_x=None,
+                                       width=100)
+            new_figure.figure = plot.fig
+            new_figure.touch_mode = "pan"
+
+            self.plots[ind]=plot
+
+            # remove all plots from scroll view
+            for widget in self.figure_widgets:
+                self.ids.figures.remove_widget(widget)
+
+            #add new widget
+            self.figure_widgets[ind]= new_figure
+
+            #plot all of them again
+            for widget in self.figure_widgets:
+                self.ids.figures.add_widget(widget)
+
+            self.update_kinematic_plot()
+        except:
+            self.show_popup("Warning", "Please use an existing image number!", "Continue")
 
     #takes care of showing/hiding plots depending on the frequency selected.
     def update_scroll_plots(self,button_dummy):
@@ -819,7 +860,6 @@ class ModelFits(TabbedPanel):
 
     #used to save/export the kinematic results, writes a directory which includes two .csv files for the component info
     #and a sub-folder /fits with the fits files, and pdf and png files for the plots
-    #TODO make it work for multifrequency and core-shift plots
     def save_kinematics(self,save_text,selection):
         save_path=str(selection[0])
 
@@ -983,6 +1023,37 @@ class ModelFits(TabbedPanel):
         #create popup for import info
         self.show_popup("Importing Kinematics",message,"Continue")
 
+    def reset_kinematics(self):
+
+        for i in range(np.max([len(self.components),len(self.ids.plot_frequency_select_buttons.children)])):
+            #delete components
+            for box in self.ids.kinematic_list.children:
+                self.ids.kinematic_list.remove_widget(box)
+
+            for box in self.ids.component_list.children:
+                self.ids.component_list.remove_widget(box)
+
+            #delete frequency buttons
+            for box in self.ids.plot_frequency_select_buttons.children:
+                self.ids.plot_frequency_select_buttons.remove_widget(box)
+
+            for box in self.ids.scroll_frequency_select_buttons.children:
+                self.ids.scroll_frequency_select_buttons.remove_widget(box)
+
+        self.active_component_ind = None
+        self.components = []
+
+        #remove plots
+        self.plots=[]
+
+        #reset redshift
+        self.ids.redshift.text = "0.0"
+
+        #delete plots
+        for figure in self.figure_widgets:
+            self.ids.figures.remove_widget(figure)
+
+        self.update_kinematic_plot()
 
     #### END OF KINEMATIC FUNCTIONS
 
@@ -992,6 +1063,7 @@ class ModelFits(TabbedPanel):
 
         #TODO some basic background checks on the files to see if they are valid and if they exist (write some popups)
         #TODO also check for polarizations. If there is only Stokes I input, grey out the polarization stacking options
+
 
         for ind,file in enumerate(self.clean_filepaths):
             if len(self.stokes_u_filepaths)>ind and len(self.stokes_q_filepaths)>ind:
