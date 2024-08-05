@@ -38,6 +38,13 @@ class FileSavePopup(Popup):
         if selection!=[]:
             self.ids.filename_save.text = str(selection[0])
 
+class PlotExportPopup(Popup):
+    load = ObjectProperty()
+
+    def load_filepath_to_view(self, selection):
+        if selection!=[]:
+            self.ids.export_plot_save.text = str(selection[0])
+
 class FileImportPopup(Popup):
     load = ObjectProperty()
 
@@ -1072,7 +1079,7 @@ class ModelFits(TabbedPanel):
                 else:
                     model=""
                 plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind])
-                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True)
+                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
             else:
                 #try to load model from clean .fits file
                 if len(self.modelfit_filepaths)>ind:
@@ -1080,7 +1087,7 @@ class ModelFits(TabbedPanel):
                 else:
                     model=""
                 plot_data=ImageData(file,model=model)
-                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True)
+                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
 
             #check if polarization information was given:
             if np.sum(image.clean_image.stokes_q)==0 or np.sum(image.clean_image.stokes_u)==0:
@@ -1302,9 +1309,17 @@ class ModelFits(TabbedPanel):
         if self.final_stack_image!="":
             if mode in ["lin_pol","frac_pol"]:
                 plot_evpa=True
+                if mode =="frac_pol":
+                    evpa_color="black"
+                    contour_color="grey"
+                else:
+                    evpa_color="white"
+                    contour_color="grey"
             else:
                 plot_evpa=False
-            StackPlot = FitsImage(self.final_stack_image,plot_mode=mode,plot_evpa=plot_evpa,title="Stacked Image")
+                evpa_color="white"
+                contour_color="grey"
+            StackPlot = FitsImage(self.final_stack_image,plot_mode=mode,plot_evpa=plot_evpa,evpa_color=evpa_color,contour_color=contour_color,title="Stacked Image")
             self.ids.stacked_image.figure = StackPlot.fig
             button.state="down"
 
@@ -1440,11 +1455,28 @@ class ModelFits(TabbedPanel):
                                                         rotate_evpa = float(self.ids.rotate_evpa.text),
                                                         evpa_color = self.ids.evpa_color.text,
                                                         title = self.ids.title.text,
+                                                        background_color=self.ids.background_color.text,
                                                         rcparams = self.ids.rcparams.text)
 
         #find active button
         active_button = next((t for t in ToggleButton.get_widgets('plotting_single_plots') if t.state == 'down'), None)
         self.change_plotting_single_plot(button=active_button)
+
+    def open_export_plot_dialog(self):
+        if len(self.plotting_single_plots)>0:
+            self.export_plot_dialog = PlotExportPopup()
+            self.export_plot_dialog.open()
+
+    def export_plotting_plot(self,export_name):
+        # find active button
+        active_button = next((t for t in ToggleButton.get_widgets('plotting_single_plots') if t.state == 'down'), None)
+        ind = np.where(np.array(self.plotting_single_plot_buttons) == active_button)[0][0]
+        active_plot = self.plotting_single_plots[ind]
+        active_plot.export(export_name)
+
+
+
+
 
 
 
@@ -1497,6 +1529,9 @@ class VCAT(App):
 
     def import_kinematics(self,directory):
         self.screen.import_kinematics(directory)
+
+    def export_plotting_plot(self,name,selection):
+        self.screen.export_plotting_plot(name)
 
     #### END OF KINEMATIC FUNCTIONS
 

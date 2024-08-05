@@ -25,8 +25,8 @@ class Component():
         self.beam_maj = beam_maj
         self.beam_min = beam_min
         self.beam_pa = beam_pa
-        self.delta_x_est = self.x
-        self.delta_y_est = self.y
+        self.delta_x_est = self.x #TODO check this!
+        self.delta_y_est = self.y #TODO check this!
         self.distance_to_core = np.sqrt(self.delta_x_est ** 2 + self.delta_y_est ** 2)
         self.redshift = redshift
         self.freq=freq

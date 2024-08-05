@@ -45,7 +45,7 @@
             spacing: 20
 
             TextInput:
-                id: filename_save
+                id: export_plot_save
                 height: 30
                 multiline: False
 
@@ -55,7 +55,7 @@
             Button:
                 text: "Save"
                 on_release:
-                    app.save_kinematics(root.ids.filename_save.text,filechooser_save.selection)
+                    app.save_kinematics(root.ids.export_plot_save.text,filechooser_save.selection)
                     root.dismiss()
                 id: save_button
                 disabled: True if filechooser_save.selection==[] else False
@@ -86,6 +86,42 @@
                 text: "Import"
                 on_release:
                     app.import_kinematics(filechooser_save.selection)
+                    root.dismiss()
+                id: save_button
+                disabled: True if filechooser_save.selection==[] else False
+
+<PlotExportPopup>:
+    title: "Export Plot"
+    size_hint: .9, .9
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "vertical"
+        FileChooser:
+            id: filechooser_save
+            multiselect: False
+            dirselect: True
+            filters: ['']
+            FileChooserIconLayout:
+                on_touch_down: root.load_filepath_to_view(filechooser_save.selection)
+
+        BoxLayout:
+            size_hint: (1, 0.1)
+            pos_hint: {'center_x': .5, 'center_y': .5}
+            spacing: 20
+
+            TextInput:
+                id: export_plot_save
+                height: 30
+                multiline: False
+
+            Button:
+                text: "Cancel"
+                on_release: root.dismiss()
+            Button:
+                text: "Save"
+                on_release:
+                    app.export_plotting_plot(root.ids.export_plot_save.text,filechooser_save.selection)
                     root.dismiss()
                 id: save_button
                 disabled: True if filechooser_save.selection==[] else False
@@ -780,6 +816,10 @@
                         id: replot_btn
                         text: "Replot"
                         on_release: root.replot()
+                    Button:
+                        id: export_plot_button
+                        text: "Export"
+                        on_release: root.open_export_plot_dialog()
                 BoxLayout
             BoxLayout:
                 size_hint_y: 0.4
@@ -869,6 +909,21 @@
                         TextInput:
                             id: rcparams
                             text: ''
+                    Label:
+                        text: ''
+                        size_hint_y: 0.1
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Bg Color"
+                        TextInput:
+                            id: background_color
+                            text: "white"
+                        Label:
+                            text: ""
+                        Label:
+                            text: ""
                 BoxLayout:
                     orientation: 'vertical'
                     padding: 20

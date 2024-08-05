@@ -368,6 +368,7 @@ class FitsImage(object):
                  rotate_evpa=0, # rotate EVPAs by a given angle in degrees (North through East)
                  evpa_color="white", # set EVPA color for plot
                  title="", # plot title (default is date)
+                 background_color="white", #background color
                  rcparams={} # option to modify matplotlib look
                  ):
 
@@ -379,6 +380,7 @@ class FitsImage(object):
         self.model_image_file = self.clean_image.model_file_path
 
         #set parameters
+        self.plot_mode=plot_mode
         self.name = self.clean_image.name
         self.freq = self.clean_image.freq
         image_data = self.clean_image.image_data
@@ -396,6 +398,7 @@ class FitsImage(object):
         beam_min = self.clean_image.beam_min
         beam_pa = self.clean_image.beam_pa
         self.evpa_color=evpa_color
+        self.background_color=background_color
 
         #plot limits
         ra_max,ra_min,dec_min,dec_max=extent
@@ -406,6 +409,9 @@ class FitsImage(object):
             dec_min, dec_max = ylim
 
         self.fig, self.ax = plt.subplots(1, 1)
+
+        #set background color
+        self.ax.set_facecolor(self.background_color)
 
         self.components=[]
 
@@ -443,8 +449,6 @@ class FitsImage(object):
 
                 self.plotColormap(plot_frac_pol,im_color,np.zeros(100),[0.01],extent,
                                   label="Fractional Linear Polarization")
-                self.evpa_color="black"
-                contour_color="grey"
 
         if plot_evpa and np.sum(self.clean_image.lin_pol)!=0:
             levs_linpol, levs1_linpol = get_sigma_levs(self.clean_image.lin_pol, lin_pol_sigma_cut)
@@ -629,6 +633,21 @@ class FitsImage(object):
         # plot the evpas
         evpa_lines = LineCollection(lines, colors=self.evpa_color, linewidths=self.evpa_width)
         self.ax.add_collection(evpa_lines)
+
+    def export(self,name):
+        #check if name is a directory, if so create generic filename in pdf and png format
+        if os.path.isdir(name):
+            if name[-1]!="/":
+                name+="/"
+            name+=self.name+"_"+"{:.2f}".format(self.freq/1e9)+"GHz_"+self.clean_image.date+"_"+self.plot_mode
+            self.fig.savefig(name+".png", dpi=300, bbox_inches='tight', transparent=False)
+            self.fig.savefig(name+".pdf", dpi=300, bbox_inches='tight', transparent=False)
+        else:
+            if name.split(".")[-1] in ("png","jpg","jpeg","pdf","gif"):
+                self.fig.savefig(name, dpi=300, bbox_inches='tight', transparent=False)
+            else:
+                self.fig.savefig(name+".png",dpi=300,bbox_inches="tight", transparent=False)
+
 
 
 # takes a an image (2d) array as input and calculates the sigma levels for plotting, sigma_contour_limit denotes the sigma level of the lowest contour
