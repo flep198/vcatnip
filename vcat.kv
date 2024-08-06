@@ -45,7 +45,7 @@
             spacing: 20
 
             TextInput:
-                id: export_plot_save
+                id: filename_save
                 height: 30
                 multiline: False
 
@@ -55,7 +55,7 @@
             Button:
                 text: "Save"
                 on_release:
-                    app.save_kinematics(root.ids.export_plot_save.text,filechooser_save.selection)
+                    app.save_kinematics(root.ids.filename_save.text,filechooser_save.selection)
                     root.dismiss()
                 id: save_button
                 disabled: True if filechooser_save.selection==[] else False
@@ -125,6 +125,42 @@
                     root.dismiss()
                 id: save_button
                 disabled: True if filechooser_save.selection==[] else False
+
+<MOJAVEExportPopup>:
+    title: "Export Data to MOJAVE Database?"
+    size_hint: 0.35,0.35
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint_y: 0.8
+        BoxLayout:
+            orientation: "vertical"
+            Label:
+                text: "Observer"
+            Label:
+                text: "Password"
+            Label:
+                text: "MOJAVE Source Name"
+            Button:
+                on_release: root.dismiss()
+                text: "No"
+        BoxLayout:
+            orientation: "vertical"
+            TextInput:
+                text: "FEP"
+                id: observer
+            TextInput:
+                password: True
+                id: password
+            TextInput:
+                id: source_name_mojave
+            Button:
+                on_release:
+                    app.export_data_to_mojave(root.ids.observer.text,root.ids.password.text,root.ids.source_name_mojave.text)
+                    root.dismiss()
+                text: "Submit"
+
 
 <ModelFits>:
     do_default_tab: False

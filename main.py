@@ -19,6 +19,7 @@ import os
 import pandas as pd
 import glob
 from stack_images import stack_fits, stack_pol_fits, get_common_beam, fold_with_beam
+from mojave_db_access import upload_csv_to_MOJAVE
 import subprocess
 
 
@@ -44,6 +45,9 @@ class PlotExportPopup(Popup):
     def load_filepath_to_view(self, selection):
         if selection!=[]:
             self.ids.export_plot_save.text = str(selection[0])
+
+class MOJAVEExportPopup(Popup):
+    load = ObjectProperty()
 
 class FileImportPopup(Popup):
     load = ObjectProperty()
@@ -959,6 +963,17 @@ class ModelFits(TabbedPanel):
 
         self.show_popup("Export Info","Export successful to \n" + save_path,"Continue")
 
+        #Optionally export the fits to MOJAVE database
+        self.component_info_csv=save_path + '/component_info.csv'
+        self.show_mojave_popup()
+
+    def show_mojave_popup(self):
+        self.the_popup = MOJAVEExportPopup()
+        self.the_popup.open()
+
+    def export_data_to_mojave(self,observer,password,source):
+        upload_csv_to_MOJAVE(self.component_info_csv, observer, password, source)
+
     #used to reimport data that was exported with the function above. Needs a directory path
     def import_kinematics(self,directory):
 
@@ -1532,6 +1547,9 @@ class VCAT(App):
 
     def export_plotting_plot(self,name,selection):
         self.screen.export_plotting_plot(name)
+
+    def export_data_to_mojave(self,observer,password,source):
+        self.screen.export_data_to_mojave(observer,password,source)
 
     #### END OF KINEMATIC FUNCTIONS
 

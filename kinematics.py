@@ -30,6 +30,28 @@ class Component():
         self.distance_to_core = np.sqrt(self.delta_x_est ** 2 + self.delta_y_est ** 2)
         self.redshift = redshift
         self.freq=freq
+
+        def calculate_theta():
+            if (self.delta_y_est > 0 and self.delta_x_est > 0) or (self.delta_y_est > 0 and self.delta_x_est < 0):
+                return np.arctan(self.delta_x_est / self.delta_y_est) / np.pi * 180
+            elif self.delta_y_est < 0 and self.delta_x_est > 0:
+                return np.arctan(self.delta_x_est / self.delta_y_est) / np.pi * 180 + 180
+            elif self.delta_y_est < 0 and self.delta_x_est < 0:
+                return np.arctan(self.delta_x_est / self.delta_y_est) / np.pi * 180 - 180
+            else:
+                return 0
+
+        # Calculate radius
+        self.radius = np.sqrt(self.delta_x_est ** 2 + self.delta_y_est ** 2) * scale
+
+        # Calculate theta
+        self.theta = calculate_theta()
+
+        # Calculate ratio
+        self.ratio = self.min / self.maj if self.maj > 0 else 0
+
+        self.size=self.maj*scale
+
         is_circular=False
         if noise==0:
             self.res_lim_min=0
@@ -75,6 +97,7 @@ class Component():
 
     def get_info(self):
         return {"x": self.x, "y": self.y, "mjd": self.mjd, "maj": self.maj, "min": self.min,
+                "radius": self.radius, "theta": self.theta, "size": self.size, "ratio": self.ratio,
                 "pos": self.pos, "flux": self.flux, "date": self.date,"year": self.year,
                 "component_number": self.component_number, "is_core": self.is_core,
                 "delta_x_est": self.delta_x_est, "delta_y_est": self.delta_y_est,

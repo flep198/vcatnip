@@ -678,7 +678,7 @@ def get_sigma_levs(image,  # 2d array/list
     return levs, levs1
 
 #gets components from .fits file
-def getComponentInfo(filename):
+def getComponentInfo(filename,scale=60*60*1000):
 
     #TODO also include reading .mod files
 
@@ -709,6 +709,27 @@ def getComponentInfo(filename):
     else:
         data_df = pd.concat([data_df, comp_data1_df], axis=0, ignore_index=True)
     os.makedirs("tmp",exist_ok=True)
+
+    #write Radius, ratio and Angle also to database
+    data_df['radius'] = np.sqrt(data_df['Delta_x'] ** 2 + data_df['Delta_y'] ** 2) * scale
+
+    # Function to calculate 'theta'
+    def calculate_theta(row):
+        if (row['Delta_y'] > 0 and row['Delta_x'] > 0) or (row['Delta_y'] > 0 and row['Delta_x'] < 0):
+            return np.arctan(row['Delta_x'] / row['Delta_y']) / np.pi * 180
+        elif (row['Delta_y'] < 0 and row['Delta_x'] > 0):
+            return np.arctan(row['Delta_x'] / row['Delta_y']) / np.pi * 180 + 180
+        elif (row['Delta_y'] < 0 and row['Delta_x'] < 0):
+            return np.arctan(row['Delta_x'] / row['Delta_y']) / np.pi * 180 - 180
+        return 0
+
+    # Apply function to calculate 'theta'
+    data_df['theta'] = data_df.apply(calculate_theta, axis=1)
+
+    # Calculate 'ratio'
+    data_df['ratio'] = data_df.apply(lambda row: row['Minor_axis'] / row['Major_axis'] if row['Major_axis'] > 0 else 0,
+                                 axis=1)
+
     return data_df
 
 #writes a .mod file given an input of from getComponentInfo(fitsfile)
@@ -725,6 +746,7 @@ def write_mod_file(model_df,writepath,freq,scale=60*60*1000):
     original_stdout=sys.stdout
     sys.stdout=open(writepath,'w')
 
+    #TODO this part is probably redundant since it is now already included in the model_df
     radius=[]
     theta=[]
     ratio=[]
