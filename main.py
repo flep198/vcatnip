@@ -1010,10 +1010,13 @@ class ModelFits(TabbedPanel):
             #now identify them with each other
             for plot in self.plots:
                 for comp in plot.components:
-                    #match plot component with component in list
-                    filter_df=comp_info[(round(comp_info["x"],15)==round(comp[1].x,15))]
-                    ind=filter_df[round(comp_info["y"],15)==round(comp[1].y,15)]["component_number"].values[0]
-
+                    print(comp[1].get_info())
+                    try:
+                        #match plot component with component in list
+                        filter_df=comp_info[(round(comp_info["x"],15)==round(comp[1].x,15))]
+                        ind=filter_df[round(comp_info["y"],15)==round(comp[1].y,15)]["component_number"].values[0]
+                    except:
+                        ind=-1
                     if ind>=0: #only do this if component was assigned
                         #activate correct button
                         for t in ToggleButton.get_widgets('components'):
