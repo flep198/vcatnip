@@ -19,7 +19,7 @@ import os
 import pandas as pd
 import glob
 from stack_images import stack_fits, stack_pol_fits, get_common_beam, fold_with_beam
-from mojave_db_access import upload_csv_to_MOJAVE
+from mojave_db_access import upload_csv_to_MOJAVE, download_kinematic_from_MOJAVE
 import subprocess
 
 
@@ -47,6 +47,9 @@ class PlotExportPopup(Popup):
             self.ids.export_plot_save.text = str(selection[0])
 
 class MOJAVEExportPopup(Popup):
+    load = ObjectProperty()
+
+class MOJAVEImportPopup(Popup):
     load = ObjectProperty()
 
 class FileImportPopup(Popup):
@@ -245,6 +248,10 @@ class ModelFits(TabbedPanel):
     def open_import_dialog(self):
         self.import_dialog = FileImportPopup()
         self.import_dialog.open()
+
+    def open_mojave_import_dialog(self):
+        self.import_mojave_dialog = MOJAVEImportPopup()
+        self.import_mojave_dialog.open()
 
     def current_color(self,ind):
         if ind is not None:
@@ -974,10 +981,12 @@ class ModelFits(TabbedPanel):
     def export_data_to_mojave(self,observer,password,source):
         upload_csv_to_MOJAVE(self.component_info_csv, observer, password, source)
 
-    #used to reimport data that was exported with the function above. Needs a directory path
-    def import_kinematics(self,directory):
+    def import_data_from_mojave(self,source,observer,band,password):
+        download_kinematic_from_MOJAVE(source,band,observer,password,self.ids.difmap_path.text,"/tmp/tmp_data_vcat")
+        self.import_kinematics(["/tmp/tmp_data_vcat",""])
 
-        #TODO reset everything before importing stuff
+    #used to reimport data that was exported with the function above. Needs a directory path
+    def import_kinematics(self,directory,check=True):
 
         #check if it is a valid vcat kinematics folder
         if (os.path.isfile(directory[0]+"/component_info.csv") and os.path.isfile(directory[0]+"/kinematic_fit.csv") and
@@ -1553,6 +1562,9 @@ class VCAT(App):
 
     def export_data_to_mojave(self,observer,password,source):
         self.screen.export_data_to_mojave(observer,password,source)
+
+    def import_data_from_mojave(self,source,observer,band,password):
+        self.screen.import_data_from_mojave(source,observer,band,password)
 
     #### END OF KINEMATIC FUNCTIONS
 

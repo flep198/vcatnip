@@ -5,6 +5,7 @@ import requests
 import os
 import pexpect
 from graph_generator import getComponentInfo
+import subprocess
 
 def upload_csv_to_MOJAVE(csv_file,observer,password,source):
     df=pd.read_csv(csv_file)
@@ -71,7 +72,7 @@ def upload_csv_to_MOJAVE(csv_file,observer,password,source):
         # Commit the transaction
         mydb.commit()
 
-def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path):
+def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path,foldername="tmp_data"):
 
     # connect to database:
     mydb = sql.connect(
@@ -95,18 +96,17 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path):
 
     component_table = pd.read_sql(sql_query,con=mydb)
 
-    component_table.to_csv("~/Desktop/PhD_Project/test.csv")
-
     epochs=np.unique(component_table["epoch"])
 
     #create folder
-    os.makedirs("tmp_data",exist_ok=True)
+    os.system("rm -rf "+foldername)
+    os.makedirs(foldername,exist_ok=True)
 
     #extract data epoch by epoch
     for index,epoch in enumerate(epochs):
         #print .mod file based on MOJAVE data
 
-        with open("tmp_data/modfile.mod", 'w') as file:
+        with open(foldername+"/modfile.mod", 'w') as file:
 
             for ind, row in component_table[component_table["epoch"]==epoch].iterrows():
                 print("{:.6f}".format(float(row["flux"])),
@@ -123,10 +123,10 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path):
         epoch=str(epoch)
         #download .uvf file from MOJAVE database
         filename=source+"."+bandname_uvf+"."+epoch.replace("-","_")
-        url = ("http://www.cv.nrao.edu/2cmVLBA/data/"+source+"/"+epoch.replace("-","_")+"/"+filename+".uvf")
-        local_filename="tmp_data/"+filename+".uvf"  # Local file name to save the download
+        url = ("https://www.cv.nrao.edu/2cmVLBA/data/"+source+"/"+epoch.replace("-","_")+"/"+filename+".uvf")
+        local_filename=foldername+"/"+filename+".uvf"  # Local file name to save the download
 
-        """
+
         # Send a GET request to the URL
         response = requests.get(url, stream=True)
 
@@ -140,11 +140,11 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path):
             print(f"File downloaded successfully as {local_filename}")
         else:
             print(f"Failed to download file. Status code: {response.status_code}")
-        """
 
-        os.chdir("tmp_data")
+
+        os.chdir(foldername)
         #Initialize DIFMAP to create modelfit.fits file
-        child = pexpect.spawn(difmap_path, encoding='utf-8', echo=False)
+        child = pexpect.spawn(difmap_path+"/difmap", encoding='utf-8', echo=False, cwd=foldername)
         child.expect_exact("0>", None, 2)
 
         def send_difmap_command(command, prompt="0>"):
@@ -161,9 +161,9 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path):
         #now create component info dataframe
         try:
             if index==0:
-                df_comp = getComponentInfo(filename+".fits")
+                df_comp = getComponentInfo(foldername+"/"+filename+".fits")
             else:
-                df_comp = pd.concat([df_comp, getComponentInfo(filename+".fits")],ignore_index=True)
+                df_comp = pd.concat([df_comp, getComponentInfo(foldername+"/"+filename+".fits")],ignore_index=True)
         except:
             pass
         os.chdir("..")
@@ -200,13 +200,15 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path):
     df_merged = df_merged.drop(columns=['Flux', 'dist', 'pa', 'id',"Flux_round","radius_round","theta_round",
                                         "Major_axis","Minor_axis","PA"])
 
-    os.chdir("tmp_data")
+    os.chdir(foldername)
     df_merged.to_csv("component_info.csv")
     os.makedirs("modelfit_files",exist_ok=True)
     os.system("mv *.fits modelfit_files")
-
-    #TODO need to create empty clean_fits folder and empty kinematic_fit.csv and then can import the stuff with import_kinematics
-    #TODO then need to implement buttons to do it.
+    os.makedirs("clean_fits",exist_ok=True)
+    os.system("cp component_info.csv kinematic_fit.csv")
+    output = subprocess.check_output("pwd",shell=True)
+    output = output.decode("utf-8").strip()
+    os.chdir("..")
 
 
 #download_kinematic_from_MOJAVE("0506+056","Ku","MLL","VLBA2cm","/usr/local/difmap/uvf_difmap_2.5g/difmap")

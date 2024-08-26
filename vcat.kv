@@ -161,6 +161,49 @@
                     root.dismiss()
                 text: "Submit"
 
+<MOJAVEImportPopup>
+    title: "Import Data from MOJAVE Database?"
+    size_hint: 0.35,0.35
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint_y: 0.8
+        BoxLayout:
+            orientation: "vertical"
+            Label:
+                text: "MOJAVE Source Name"
+            Label:
+                text: "Observer"
+            Label:
+                text: "Band (e.g., Ku, K, Q)"
+            Label:
+                text: "Password"
+            Button:
+                on_release: root.dismiss()
+                text: "No"
+        BoxLayout:
+            orientation: "vertical"
+            TextInput:
+                text: ""
+                id: source
+            TextInput:
+                text: ""
+                id: observer
+            TextInput:
+                text: ""
+                id: band
+            TextInput:
+                password: True
+                id: password
+            Button:
+                on_release:
+                    app.import_data_from_mojave(root.ids.source.text,root.ids.observer.text,root.ids.band.text,root.ids.password.text)
+                    root.dismiss()
+                text: "Submit"
+
+
+
 
 <ModelFits>:
     do_default_tab: False
@@ -320,6 +363,10 @@
                     text: 'Reset'
                     size_hint_x: 0.2
                     on_release: root.reset_kinematics()
+                Button:
+                    text: 'Import from MOJAVE'
+                    size_hint_x: 0.2
+                    on_release: root.open_mojave_import_dialog()
                 Label:
                     text: ""
                     size_hint_x: 0.6
