@@ -333,6 +333,9 @@
                 text: ''
                 size_hint_x: 1
             Label:
+                text: 'Settings'
+                size_hint_x: 1
+            Label:
                 text: ''
                 size_hint_x: 0.2
             Label:
@@ -342,6 +345,47 @@
                 text:'/usr/local/difmap/uvf_difmap_2.5g'
                 id: difmap_path
                 size_hint_x:0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: "Noise Estimation"
+                size_hint_x: 0.2
+            Spinner:
+                text: 'Histogram Fit'
+                id: noise_fit_method
+                values: ['Histogram Fit', 'Image RMS', 'Residual Map',"Entropy"]
+                size_hint_x: 0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: "Kinematic Fit"
+                size_hint_x: 0.2
+            Spinner:
+                text: 'Lin. Fit Distance to Core'
+                id: kinematic_fit_method
+                values: ['Lin. Fit Distance to Core', 'Lin. Fit of X and Y separately']
+                size_hint_x: 0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: "Default File Path"
+                size_hint_x: 0.2
+            TextInput:
+                text: ''
+                id: default_file_path
+                size_hint_x: 0.4
             Label:
                 text: ''
                 size_hint_x: 0.2
@@ -1131,9 +1175,6 @@
                         TextInput:
                             id: lin_pol_sigma_cut
                             text: "3"
-
-
-
 
 
 

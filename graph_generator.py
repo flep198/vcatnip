@@ -1,5 +1,4 @@
 import matplotlib as mpl
-from kivy.metrics import dp
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -26,8 +25,8 @@ mpl.rcParams['font.family'] = 'Quicksand'
 #mpl.rcParams['axes.spines.right'] = False
 mpl.rcParams['axes.linewidth'] = 1.0
 
-font_size_axis_title=dp(13)
-font_size_axis_tick=dp(12)
+font_size_axis_title=13
+font_size_axis_tick=12
 
 class KinematicPlot(object):
     def __init__(self):
