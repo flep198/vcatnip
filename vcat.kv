@@ -151,6 +151,7 @@
                 text: "FEP"
                 id: observer
             TextInput:
+                text: app.screen.mojave_password
                 password: True
                 id: password
             TextInput:
@@ -184,9 +185,17 @@
                 text: "No"
         BoxLayout:
             orientation: "vertical"
-            TextInput:
-                text: ""
-                id: source
+            BoxLayout:
+                orientation:"horizontal"
+                TextInput:
+                    size_hint_x: 0.5
+                    text: ""
+                    id: source
+                Button:
+                    size_hint_x: 0.5
+                    text: "Search Modelfits"
+                    on_release:
+                        app.screen.search_mojave_models(root.ids.source.text)
             TextInput:
                 text: ""
                 id: observer
@@ -194,11 +203,42 @@
                 text: ""
                 id: band
             TextInput:
+                text: app.screen.mojave_password
                 password: True
                 id: password
             Button:
                 on_release:
                     app.import_data_from_mojave(root.ids.source.text,root.ids.observer.text,root.ids.band.text,root.ids.password.text)
+                    root.dismiss()
+                text: "Submit"
+
+<MOJAVEPasswordPopup>
+    title: "Please provide MOJAVE password!"
+    size_hint: 0.2,0.2
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint_y: 0.8
+        BoxLayout:
+            orientation: "vertical"
+            Label:
+                text: "Password"
+            Button:
+                on_release:
+                    app.screen.the_popup.dismiss()
+                    root.dismiss()
+                text: "No"
+        BoxLayout:
+            orientation: "vertical"
+            TextInput:
+                text: app.screen.mojave_password
+                password: True
+                id: password
+            Button:
+                on_release:
+                    app.set_mojave_password(root.ids.password.text)
+                    app.screen.the_popup.ids.password.text=root.ids.password.text
                     root.dismiss()
                 text: "Submit"
 
@@ -589,6 +629,13 @@
                                     group:'kinematic_select'
                                     text:"TB"
                                     id: tb_choose
+                                    on_release:
+                                        app.update_kinematic_plot()
+                                        self.state='down'
+                                ToggleButton:
+                                    group:'kinematic_select'
+                                    text:"Chi-Square"
+                                    id: chi_square_choose
                                     on_release:
                                         app.update_kinematic_plot()
                                         self.state='down'

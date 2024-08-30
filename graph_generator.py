@@ -1,3 +1,5 @@
+from os import write
+
 import matplotlib as mpl
 import numpy as np
 import pandas as pd
@@ -13,6 +15,7 @@ from kinematics import Component
 from astropy.time import Time
 import sys
 import pexpect
+from datetime import datetime
 
 #optimized draw on Agg backend
 mpl.rcParams['path.simplify'] = True
@@ -59,6 +62,52 @@ class KinematicPlot(object):
         self.ax.set_xlabel('Time [year]', fontsize=font_size_axis_title)
         self.ax.set_ylabel('Brightness Temperature [K]', fontsize=font_size_axis_title)
         self.ax.set_yscale("log")
+
+    def plot_chi_square(self,uvf_files,modelfit_files,difmap_path):
+
+        #calculate chi-squares
+        chi_squares=[]
+        dates=[]
+
+        for ind,uvf in enumerate(uvf_files):
+            df=getComponentInfo(modelfit_files[ind])
+            freq=get_freq(modelfit_files[ind])
+            write_mod_file(df,"modelfit.mod",freq,adv=True)
+            chi_square=get_model_chi_square_red(uvf,"modelfit.mod",difmap_path)
+            chi_squares.append(chi_square)
+            dates.append(get_date(modelfit_files[ind]))
+            os.system("rm -rf modelfit.mod")
+
+        chi_squares=np.array(chi_squares)
+
+        for ind,dat in enumerate(dates):
+            #calculate decimal year
+            date = datetime.strptime(dat, "%Y-%m-%d")
+
+            # Calculate the start of the year and the start of the next year
+            start_of_year = datetime(date.year, 1, 1)
+            start_of_next_year = datetime(date.year + 1, 1, 1)
+
+            # Calculate the number of days since the start of the year and total days in the year
+            days_since_start_of_year = (date - start_of_year).days
+            total_days_in_year = (start_of_next_year - start_of_year).days
+
+            # Calculate the decimal year
+            decimal_year = date.year + days_since_start_of_year / total_days_in_year
+            dates[ind]=float(decimal_year)
+
+        #make plot
+        self.ax.plot(dates,chi_squares,color="black")
+        self.ax.scatter(dates,chi_squares,color="black")
+
+        self.ax.set_xlabel('Time [year]', fontsize=font_size_axis_title)
+        self.ax.set_ylabel('Reduced Chi-Square of Modelfits', fontsize=font_size_axis_title)
+
+        try:
+            self.set_limits([np.min(dates)-0.5,np.max(dates)+0.5],
+                            [np.min(chi_squares)-1,np.max(chi_squares)+1])
+        except:
+            pass
 
     def set_limits(self,x,y):
         self.ax.set_xlim(x)
@@ -732,7 +781,8 @@ def getComponentInfo(filename,scale=60*60*1000):
     return data_df
 
 #writes a .mod file given an input of from getComponentInfo(fitsfile)
-def write_mod_file(model_df,writepath,freq,scale=60*60*1000):
+#the adv options adds a "v" character to the model to make the parameters fittable in DIFMAP
+def write_mod_file(model_df,writepath,freq,scale=60*60*1000,adv=False):
 
     flux = np.array(model_df["Flux"])
     delta_x = np.array(model_df["Delta_x"])
@@ -775,11 +825,17 @@ def write_mod_file(model_df,writepath,freq,scale=60*60*1000):
     pos=np.array(pos)[argsort]
     typ_obj=np.array(typ_obj)[argsort]
 
+    #check if we need to ad "v" to the components to make them fittable
+    if adv:
+        ad="v"
+    else:
+        ad=""
+
     for ind in range(len(flux)):
-        print(" "+"{:.8f}".format(flux[ind])+"   "+
-              "{:.8f}".format(radius[ind])+"    "+
-              "{:.3f}".format(theta[ind])+"   "+
-              "{:.7f}".format(maj[ind]*scale)+"    "+
+        print(" "+"{:.8f}".format(flux[ind])+ad+"   "+
+              "{:.8f}".format(radius[ind])+ad+"    "+
+              "{:.3f}".format(theta[ind])+ad+"   "+
+              "{:.7f}".format(maj[ind]*scale)+ad+"    "+
               "{:.6f}".format(ratio[ind])+"   "+
               "{:.4f}".format(pos[ind])+"  "+
               str(int(typ_obj[ind]))+" "+
@@ -824,6 +880,17 @@ def write_mod_file_from_casa(file_path,channel="i",export="export.mod"):
 
     #create mod file
     write_mod_file(model_df,export,image_data.freq,image_data.scale)
+
+def get_freq(fits_file):
+    freq=0
+    hdu_list=fits.open(fits_file)
+    for i in range(1,4):
+        try:
+            if "FREQ" in hdu_list[0].header["CTYPE"+str(i)]:
+                freq=hdu_list[0].header["CRVAL"+str(i)]
+        except:
+            pass
+    return float(freq)
 
 def get_date(filename):
 
@@ -920,24 +987,19 @@ def get_model_chi_square_red(uvf_file,mod_file,difmap_path):
     def send_difmap_command(command, prompt="0>"):
         child.sendline(command)
         child.expect_exact(prompt, None, 2)
+        return child.before
 
     send_difmap_command("obs " + uvf_file)
     send_difmap_command("select i")
     send_difmap_command("uvw 0,-1")  # use natural weighting
     send_difmap_command("rmod " + mod_file)
     #send modelfit 0 command to calculate chi-squared
-    send_difmap_command("modelfit 0")
+    output=send_difmap_command("modelfit 0")
 
-    chi_sq_red=0
-    with open("difmap.log","r") as f:
-        lines=f.readlines()
-        for line in lines:
-            if "Iteration 00" in line:
-                chi_sq_red=float(line.split("=")[1].split()[0])
+    lines=output.splitlines()
+    for line in lines:
+        if "Iteration 00" in line:
+            chi_sq_red=float(line.split("=")[1].split()[0])
 
     os.system("rm -rf difmap.log")
     return chi_sq_red
-
-
-
-

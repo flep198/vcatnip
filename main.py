@@ -19,7 +19,7 @@ import os
 import pandas as pd
 import glob
 from stack_images import stack_fits, stack_pol_fits, get_common_beam, fold_with_beam
-from mojave_db_access import upload_csv_to_MOJAVE, download_kinematic_from_MOJAVE
+from mojave_db_access import upload_csv_to_MOJAVE, download_kinematic_from_MOJAVE, query_models, check_password
 import subprocess
 
 
@@ -52,6 +52,9 @@ class MOJAVEExportPopup(Popup):
 class MOJAVEImportPopup(Popup):
     load = ObjectProperty()
 
+class MOJAVEPasswordPopup(Popup):
+    load = ObjectProperty()
+
 class FileImportPopup(Popup):
     load = ObjectProperty()
 
@@ -73,6 +76,7 @@ class ModelFits(TabbedPanel):
     core_component_ind=None
     name=""
     component_collections = []
+    mojave_password=""
 
     #### STACKING variables
     stacking_single_plots = []
@@ -87,6 +91,14 @@ class ModelFits(TabbedPanel):
     plotting_single_plot_checkboxes = []
 
     #### GENERAL FUNCTIONS ACROSS TABS
+
+    def set_mojave_password(self,password):
+        #TODO implement a check if the password is correct, if not, open MOJAVEPasswordPopup again.
+        if check_password(password):
+            self.mojave_password=password
+        else:
+            self.mojave_password_dialog = MOJAVEPasswordPopup()
+            self.mojave_password_dialog.open()
 
     def show_popup(self,title,text,button_text):
         popup = Popup(title=title, auto_dismiss=False, size_hint=(0.35,0.35))
@@ -250,8 +262,25 @@ class ModelFits(TabbedPanel):
         self.import_dialog.open()
 
     def open_mojave_import_dialog(self):
-        self.import_mojave_dialog = MOJAVEImportPopup()
-        self.import_mojave_dialog.open()
+        self.the_popup = MOJAVEImportPopup()
+        self.the_popup.open()
+
+        if self.mojave_password=="":
+            self.mojave_password_dialog = MOJAVEPasswordPopup()
+            self.mojave_password_dialog.open()
+
+    def search_mojave_models(self,sourcename):
+
+        models=query_models(sourcename,self.mojave_password)
+        if len(models)>0:
+            output_text="The following models are available in the MOJAVE DB:"
+            for mod in models:
+                output_text+="\n"+mod
+        else:
+            output_text="No models found in the MOJAVE DB"
+        self.show_popup("Available MOJAVE models",output_text,"Continue")
+
+
 
     def current_color(self,ind):
         if ind is not None:
@@ -678,6 +707,11 @@ class ModelFits(TabbedPanel):
 
         plots_to_fit=self.plots
 
+        #check for chi-square plot
+        if active_button != None and active_button.text == "Chi-Square":
+            self.kplot.plot_chi_square(self.uvf_filepaths, self.modelfit_filepaths, self.ids.difmap_path.text)
+
+
         #calculate Core Shift based on modelfits
         if active_button != None and active_button.text == "Core Shift" and len(plots_to_fit)>0:
             t_max=0
@@ -818,6 +852,7 @@ class ModelFits(TabbedPanel):
                     self.kplot.plot_kinematics(comp_collection,self.current_color(i))
                     self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
                                           [0, 1.2 * d_max])
+
 
                 fit_data = comp_collection.get_speed()
                 if (active_button != None) and (len(collection)>2) and (active_button.text == "Kinematic"):
@@ -982,6 +1017,10 @@ class ModelFits(TabbedPanel):
         self.the_popup = MOJAVEExportPopup()
         self.the_popup.open()
 
+        if self.mojave_password=="":
+            self.mojave_password_dialog = MOJAVEPasswordPopup()
+            self.mojave_password_dialog.open()
+
     def export_data_to_mojave(self,observer,password,source):
         upload_csv_to_MOJAVE(self.component_info_csv, observer, password, source)
 
@@ -1028,7 +1067,7 @@ class ModelFits(TabbedPanel):
             #now identify them with each other
             for plot in self.plots:
                 for comp in plot.components:
-                    print(comp[1].get_info())
+                    #print(comp[1].get_info())
                     try:
                         #match plot component with component in list
                         filter_df=comp_info[(round(comp_info["x"],15)==round(comp[1].x,15))]
@@ -1574,6 +1613,9 @@ class VCAT(App):
 
     def import_data_from_mojave(self,source,observer,band,password):
         self.screen.import_data_from_mojave(source,observer,band,password)
+
+    def set_mojave_password(self,password):
+        self.screen.set_mojave_password(password)
 
     #### END OF KINEMATIC FUNCTIONS
 

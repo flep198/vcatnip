@@ -270,6 +270,38 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path,fol
     output = output.decode("utf-8").strip()
     os.chdir("..")
 
+def query_models(source,password):
+
+    # connect to database:
+    mydb = sql.connect(
+        host="mojavedb.mpifr-bonn.mpg.de",
+        user="agn",
+        password=password,
+        database="galaxies"
+    )
+
+    bands=["Ku","K","Q"]
+    options=[]
+    for i,table in enumerate(["components","Kcomponents","Qcomponents"]):
+        sql_query="select observer from {0} where source='{1}' group by observer".format(table,source)
+        df=pd.read_sql(sql_query,con=mydb)
+        for ind,obs in enumerate(df["observer"]):
+            options.append(obs+" "+bands[i])
+
+    return options
+
+def check_password(password):
+    # try connecting to database:
+    try:
+        mydb = sql.connect(
+            host="mojavedb.mpifr-bonn.mpg.de",
+            user="agn",
+            password=password,
+            database="galaxies"
+        )
+    except:
+        return False
+    return True
 
 #download_kinematic_from_MOJAVE("0506+056","Ku","MLL","VLBA2cm","/usr/local/difmap/uvf_difmap_2.5g/difmap")
 
