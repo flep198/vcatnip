@@ -891,6 +891,7 @@ class ModelFits(TabbedPanel):
         os.makedirs(save_path,exist_ok=True)
         os.makedirs(save_path+"/modelfit_files",exist_ok=True)
         os.makedirs(save_path+"/clean_fits",exist_ok=True)
+        os.makedirs(save_path+"/uvf_files",exist_ok=True)
 
         #copy fits files to common directory
         for file in self.modelfit_filepaths:
@@ -898,6 +899,9 @@ class ModelFits(TabbedPanel):
 
         for file in self.clean_filepaths:
             os.system("cp " + file + " " + save_path + "/clean_fits/")
+
+        for file in self.uvf_filepaths:
+            os.system("cp " + file + " " + save_path + "/uvf_files/")
 
         #export Table as seen on the screen with kinematic results
         export_infos=[]
@@ -997,6 +1001,11 @@ class ModelFits(TabbedPanel):
             self.load_modelfit(selection)
             selection = glob.glob(directory[0] + "/clean_fits/*")
             self.load_clean(selection)
+            try:
+                selection = glob.glob(directory[0]+"/uvf_files/*")
+                self.load_uvf(selection)
+            except:
+                pass
             self.create_kinematic_plots()
 
             #add components
