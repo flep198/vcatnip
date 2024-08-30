@@ -907,6 +907,36 @@ def get_noise_from_residual_map(residual_fits, center_x, center_y, x_width, y_wi
 
     return np.average(data[x_min:x_max,y_min:y_max]) #TODO check order of x/y here and if AVERAGE is the correct thing to do!!!
 
+#returns the reduced chi-square of a modelfit
+def get_model_chi_square_red(uvf_file,mod_file,difmap_path):
+    # add difmap to PATH
+    if difmap_path != None and not difmap_path in os.environ['PATH']:
+        os.environ['PATH'] = os.environ['PATH'] + ':{0}'.format(difmap_path)
+
+    # Initialize difmap call
+    child = pexpect.spawn('difmap', encoding='utf-8', echo=False)
+    child.expect_exact("0>", None, 2)
+
+    def send_difmap_command(command, prompt="0>"):
+        child.sendline(command)
+        child.expect_exact(prompt, None, 2)
+
+    send_difmap_command("obs " + uvf_file)
+    send_difmap_command("select i")
+    send_difmap_command("uvw 0,-1")  # use natural weighting
+    send_difmap_command("rmod " + mod_file)
+    #send modelfit 0 command to calculate chi-squared
+    send_difmap_command("modelfit 0")
+
+    chi_sq_red=0
+    with open("difmap.log","r") as f:
+        lines=f.readlines()
+        for line in lines:
+            if "Iteration 00" in line:
+                chi_sq_red=float(line.split("=")[1].split()[0])
+
+    os.system("rm -rf difmap.log")
+    return chi_sq_red
 
 
 
