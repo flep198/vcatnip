@@ -130,6 +130,7 @@ class ImageData(object):
                  stokes_u="",
                  model_save_dir="tmp/mod_files_model/",
                  is_casa_model=False,
+                 noise_method="Image RMS", #choose noise method
                  difmap_path=""):
 
         self.file_path = fits_file
@@ -140,6 +141,7 @@ class ImageData(object):
         self.uvf_file=uvf_file
         self.difmap_path=difmap_path
         self.residual_map_path=""
+        self.noise_method=noise_method
 
         # Read clean files in
         if fits_file!="":
@@ -295,17 +297,17 @@ class ImageData(object):
         self.date = get_date(fits_file)
 
 
-        #calculate image noise
-        unused, levs_i = get_sigma_levs(self.Z, 1) #get noise for stokes i
+        #calculate image noise according to the method selected
+        unused, levs_i = get_sigma_levs(self.Z, 1,noise_method=self.noise_method) #get noise for stokes i
         try:
-            unused, levs_pol = get_sigma_levs(self.lin_pol, 1) #get noise for polarization
+            unused, levs_pol = get_sigma_levs(self.lin_pol, 1,noise_method=self.noise_method) #get noise for polarization
         except:
             levs_pol=[0]
 
         # calculate image noise
-        unused, levs_i_3sigma = get_sigma_levs(self.Z, 3)  # get noise for stokes i
+        unused, levs_i_3sigma = get_sigma_levs(self.Z, 3,noise_method=self.noise_method)  # get noise for stokes i
         try:
-            unused, levs_pol_3sigma = get_sigma_levs(self.lin_pol, 3)  # get noise for polarization
+            unused, levs_pol_3sigma = get_sigma_levs(self.lin_pol, 3,noise_method=self.noise_method)  # get noise for polarization
         except:
             levs_pol_3sigma = [0]
 
@@ -417,7 +419,8 @@ class FitsImage(object):
                  evpa_color="white", # set EVPA color for plot
                  title="", # plot title (default is date)
                  background_color="white", #background color
-                 rcparams={} # option to modify matplotlib look
+                 rcparams={}, # option to modify matplotlib look
+                 noise_method="Image RMS" #choose noise_method
                  ):
 
         super().__init__()
@@ -447,6 +450,7 @@ class FitsImage(object):
         beam_pa = self.clean_image.beam_pa
         self.evpa_color=evpa_color
         self.background_color=background_color
+        self.noise_method=noise_method
 
         #plot limits
         ra_max,ra_min,dec_min,dec_max=extent
@@ -474,7 +478,7 @@ class FitsImage(object):
         clean_alpha = 1  # float for sympol transparency
 
         #get sigma levs
-        levs, levs1 = get_sigma_levs(Z,stokes_i_sigma_cut)
+        levs, levs1 = get_sigma_levs(Z,stokes_i_sigma_cut,noise_method=self.noise_method)
 
         # Image colormap
         if self.im_colormap == True and plot_mode=="stokes_i":
@@ -484,7 +488,7 @@ class FitsImage(object):
 
         if (plot_mode=="lin_pol" or plot_mode=="frac_pol") and np.sum(self.clean_image.lin_pol)!=0:
 
-            levs_linpol, levs1_linpol = get_sigma_levs(self.clean_image.lin_pol, lin_pol_sigma_cut)
+            levs_linpol, levs1_linpol = get_sigma_levs(self.clean_image.lin_pol, lin_pol_sigma_cut,noise_method=self.noise_method)
 
             if plot_mode=="lin_pol":
                 self.plotColormap(self.clean_image.lin_pol,im_color,levs_linpol,levs1_linpol,extent,
@@ -499,7 +503,7 @@ class FitsImage(object):
                                   label="Fractional Linear Polarization")
 
         if plot_evpa and np.sum(self.clean_image.lin_pol)!=0:
-            levs_linpol, levs1_linpol = get_sigma_levs(self.clean_image.lin_pol, lin_pol_sigma_cut)
+            levs_linpol, levs1_linpol = get_sigma_levs(self.clean_image.lin_pol, lin_pol_sigma_cut,noise_method=self.noise_method)
             self.plotEvpa(self.clean_image.evpa, rotate_evpa, evpa_len, evpa_distance, levs1_linpol, levs1)
 
         # Contour plot
@@ -697,31 +701,40 @@ class FitsImage(object):
                 self.fig.savefig(name+".png",dpi=300,bbox_inches="tight", transparent=False)
 
 
-
 # takes a an image (2d) array as input and calculates the sigma levels for plotting, sigma_contour_limit denotes the sigma level of the lowest contour
 def get_sigma_levs(image,  # 2d array/list
-                   sigma_contour_limit=3  # choose the lowest sigma contour to plot
+                   sigma_contour_limit=3, # choose the lowest sigma contour to plot
+                   noise_method="Image RMS",
                    ):
-    Z1 = image.flatten()
-    bin_heights, bin_borders = np.histogram(Z1 - np.min(Z1) + 10 ** (-5), bins="auto")
-    bin_widths = np.diff(bin_borders)
-    bin_centers = bin_borders[:-1] + bin_widths / 2.
-    bin_heights_err = np.where(bin_heights != 0, np.sqrt(bin_heights), 1)
+    if noise_method=="Histogram Fit":
+        Z1 = image.flatten()
+        bin_heights, bin_borders = np.histogram(Z1 - np.min(Z1) + 10 ** (-5), bins="auto")
+        bin_widths = np.diff(bin_borders)
+        bin_centers = bin_borders[:-1] + bin_widths / 2.
+        bin_heights_err = np.where(bin_heights != 0, np.sqrt(bin_heights), 1)
 
-    t_init = models.Gaussian1D(np.max(bin_heights), np.median(Z1 - np.min(Z1) + 10 ** (-5)), 0.001)
-    fit_t = fitting.LevMarLSQFitter()
-    t = fit_t(t_init, bin_centers, bin_heights, weights=1. / bin_heights_err)
-    noise = t.stddev.value
+        t_init = models.Gaussian1D(np.max(bin_heights), np.median(Z1 - np.min(Z1) + 10 ** (-5)), 0.001)
+        fit_t = fitting.LevMarLSQFitter()
+        t = fit_t(t_init, bin_centers, bin_heights, weights=1. / bin_heights_err)
+        noise = t.stddev.value
 
-    # Set contourlevels to mean value + 3 * rms_noise * 2 ** x
-    levs1 = t.mean.value + np.min(Z1) - 10 ** (-5) + sigma_contour_limit * t.stddev.value * np.logspace(0, 100, 100,
-                                                                                                        endpoint=False,
-                                                                                                        base=2)
-    levs = t.mean.value + np.min(Z1) - 10 ** (-5) - sigma_contour_limit * t.stddev.value * np.logspace(0, 100, 100,
-                                                                                                       endpoint=False,
-                                                                                                       base=2)
-    levs = np.flip(levs)
-    levs = np.concatenate((levs, levs1))
+        # Set contourlevels to mean value + 3 * rms_noise * 2 ** x
+        levs1 = t.mean.value + np.min(Z1) - 10 ** (-5) + sigma_contour_limit * t.stddev.value * np.logspace(0, 100, 100,
+                                                                                                            endpoint=False,
+                                                                                                            base=2)
+        levs = t.mean.value + np.min(Z1) - 10 ** (-5) - sigma_contour_limit * t.stddev.value * np.logspace(0, 100, 100,
+                                                                                                           endpoint=False,
+                                                                                                           base=2)
+        levs = np.flip(levs)
+        levs = np.concatenate((levs, levs1))
+
+    elif noise_method=="Image RMS":
+        Z1 = image.flatten()
+        noise = np.std(Z1)
+        levs1 = sigma_contour_limit * noise * np.logspace(0, 100, 100, endpoint=False, base=2)
+        levs = np.flip(-levs1)
+        levs = np.concatenate((levs, levs1))
+
 
     return levs, levs1
 
@@ -972,7 +985,7 @@ def get_noise_from_residual_map(residual_fits, center_x, center_y, x_width, y_wi
     x_min=np.argmin(abs(residual_map.X*scale-(center_x+x_width/2)))
     y_max=np.argmin(abs(residual_map.Y*scale-(center_y+y_width/2)))
 
-    return np.average(data[x_min:x_max,y_min:y_max]) #TODO check order of x/y here and if AVERAGE is the correct thing to do!!!
+    return np.std(data[x_min:x_max,y_min:y_max]) #TODO check order of x/y here and if STD! is the correct thing to do!!!
 
 #returns the reduced chi-square of a modelfit
 def get_model_chi_square_red(uvf_file,mod_file,difmap_path):

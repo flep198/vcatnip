@@ -89,6 +89,7 @@ class ModelFits(TabbedPanel):
     plotting_single_plots_data = []
     plotting_single_plot_buttons = []
     plotting_single_plot_checkboxes = []
+    noise_method=""
 
     #### GENERAL FUNCTIONS ACROSS TABS
 
@@ -334,11 +335,12 @@ class ModelFits(TabbedPanel):
             #create plots for view page
             for ind,filepath in enumerate(modelfit_files_to_plot):
                 if not len(uvf_files_to_plot) == len(modelfit_files_to_plot):
-                    plot_data=ImageData(clean_files_to_plot[ind],model=filepath)
+                    plot_data=ImageData(clean_files_to_plot[ind],model=filepath,noise_method=self.noise_method)
                     warn_uvf=True
                 else:
-                    plot_data = ImageData(clean_files_to_plot[ind], model=filepath, uvf_file=uvf_files_to_plot[ind],difmap_path=self.ids.difmap_path.text)
-                plot=FitsImage(plot_data,overplot_gauss=True)
+                    plot_data = ImageData(clean_files_to_plot[ind], model=filepath, uvf_file=uvf_files_to_plot[ind],
+                                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
+                plot=FitsImage(plot_data,overplot_gauss=True,noise_method=self.noise_method)
                 fits_images=np.append(fits_images,plot)
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
             if warn_uvf:
@@ -351,11 +353,12 @@ class ModelFits(TabbedPanel):
             warn_uvf=False
             for ind,filepath in enumerate(modelfit_files_to_plot):
                 if not len(uvf_files_to_plot) == len(modelfit_files_to_plot):
-                    plot_data = ImageData(filepath,model=filepath)
+                    plot_data = ImageData(filepath,model=filepath,noise_method=self.noise_method)
                     warn_uvf=True
                 else:
-                    plot_data = ImageData(filepath, model=filepath, uvf_file=uvf_files_to_plot[ind],difmap_path=self.ids.difmap_path.text)
-                plot = FitsImage(plot_data,overplot_gauss=True)
+                    plot_data = ImageData(filepath, model=filepath, uvf_file=uvf_files_to_plot[ind],
+                                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
+                plot = FitsImage(plot_data,overplot_gauss=True,noise_method=self.noise_method)
                 fits_images = np.append(fits_images, plot)
             self.show_popup("Warning",
                             "No clean images imported, using only modelfit images.\n Have fun doing kinematics!",
@@ -426,17 +429,20 @@ class ModelFits(TabbedPanel):
             #create new ImageData object
             try:
                 plot_data=ImageData(self.clean_filepaths[ind], model=self.modelfit_filepaths[ind], uvf_file=self.uvf_filepaths[ind],
-                          difmap_path=self.ids.difmap_path.text)
+                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
             except:
                 try:
-                    plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],uvf_file=self.uvf_filepaths[ind])
+                    plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],
+                                        uvf_file=self.uvf_filepaths[ind],noise_method=self.noise_method)
                 except:
                     try:
-                        plot_data=ImageData(self.clean_filepaths[ind],model=self.modelfit_filepaths[ind])
+                        plot_data=ImageData(self.clean_filepaths[ind],model=self.modelfit_filepaths[ind],
+                                            noise_method=self.noise_method)
                     except:
-                        plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind])
+                        plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],
+                                            noise_method=self.noise_method)
 
-            plot = FitsImage(plot_data, overplot_gauss=True)
+            plot = FitsImage(plot_data, overplot_gauss=True,noise_method=self.noise_method)
             #create Figure
             new_figure = MatplotFigure(size_hint_x=None,
                                        width=100)
@@ -708,6 +714,7 @@ class ModelFits(TabbedPanel):
         plots_to_fit=self.plots
 
         #check for chi-square plot
+        #TODO Make it seperate for every frequency!!
         if active_button != None and active_button.text == "Chi-Square":
             self.kplot.plot_chi_square(self.uvf_filepaths, self.modelfit_filepaths, self.ids.difmap_path.text)
 
@@ -1154,7 +1161,7 @@ class ModelFits(TabbedPanel):
                 else:
                     model=""
                 plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind])
-                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
+                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey",noise_method=self.noise_method)
             else:
                 #try to load model from clean .fits file
                 if len(self.modelfit_filepaths)>ind:
@@ -1162,7 +1169,7 @@ class ModelFits(TabbedPanel):
                 else:
                     model=""
                 plot_data=ImageData(file,model=model)
-                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
+                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey",noise_method=self.noise_method)
 
             #check if polarization information was given:
             if np.sum(image.clean_image.stokes_q)==0 or np.sum(image.clean_image.stokes_u)==0:
@@ -1263,16 +1270,16 @@ class ModelFits(TabbedPanel):
 
             for i in range(len(files_to_stack)):
                 if models_loaded:
-                    image=ImageData(files_to_stack[i],model=files_to_stack_models[i])
+                    image=ImageData(files_to_stack[i],model=files_to_stack_models[i],noise_method=self.noise_method)
                 else:
-                    image=ImageData(files_to_stack[i])
+                    image=ImageData(files_to_stack[i],noise_method=self.noise_method)
                 mod_file_paths.append("tmp/mod_files_clean/"+image.date+ "_" + "{:.0f}".format(image.freq/1e9).replace(".","_") + "GHz.mod")
 
             if fold_polarization_beams:
                 try:
                     #DIFMAP style
                     for file in files_to_stack_q:
-                        image_q=ImageData(file,model_save_dir="tmp/mod_files_q/")
+                        image_q=ImageData(file,model_save_dir="tmp/mod_files_q/",noise_method=self.noise_method)
                         mod_file_paths_q.append("tmp/mod_files_q/" + image_q.date + "_" +"{:.0f}".format(image_q.freq/1e9).replace(".","_") + "GHz.mod")
                     if len(files_to_stack_q)==0:
                         raise Exception()
@@ -1280,7 +1287,7 @@ class ModelFits(TabbedPanel):
                     # TRY to import CASA clean model
                     try:
                         for file in files_to_stack_casa_clean_models:
-                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True)
+                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method)
                             mod_file_paths_q.append("tmp/mod_files_q/"+image_model.date+ "_" + "{:.0f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
                             files_to_stack_q.append(file)
                     except:
@@ -1290,7 +1297,7 @@ class ModelFits(TabbedPanel):
                 try:
                     #DIFMAP style
                     for file in files_to_stack_u:
-                        image_u=ImageData(file,model_save_dir="tmp/mod_files_u/")
+                        image_u=ImageData(file,model_save_dir="tmp/mod_files_u/",noise_method=self.noise_method)
                         mod_file_paths_u.append("tmp/mod_files_u/"+image_u.date+ "_" + "{:.0f}".format(image_u.freq/1e9).replace(".","_") + "GHz.mod")
                     if len(files_to_stack_u)==0:
                         raise Exception()
@@ -1298,7 +1305,7 @@ class ModelFits(TabbedPanel):
                     try:
                         # TRY to import CASA clean model
                         for file in files_to_stack_casa_clean_models:
-                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True)
+                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method)
                             mod_file_paths_u.append("tmp/mod_files_u/"+image_model.date+ "_" +"{:.0f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
                             files_to_stack_u.append(file)
                     except:
@@ -1355,11 +1362,12 @@ class ModelFits(TabbedPanel):
         if self.ids.stack_stokes_check.active:
             output_stacked = stack_fits(files_to_stack,align=align,stokes_q_fits=files_to_stack_q,stokes_u_fits=files_to_stack_u)
             if len(output_stacked) == 1:
-                stack_image = ImageData(files_to_stack[0],pol_from_stokes=True)
+                stack_image = ImageData(files_to_stack[0],pol_from_stokes=True,noise_method=self.noise_method)
                 stack_image.Z = output_stacked[0][0]
             elif len(output_stacked) > 1: #check for polarization
                 stack_image = ImageData(files_to_stack[0], stokes_i=output_stacked[0][0],
-                                        pol_from_stokes=True,stokes_q=output_stacked[1][0],stokes_u=output_stacked[2][0])
+                                        pol_from_stokes=True,stokes_q=output_stacked[1][0],stokes_u=output_stacked[2][0],
+                                        noise_method=self.noise_method)
                 stack_image.Z = output_stacked[0][0]
                 stack_image.stokes_q = output_stacked[1][0]
                 stack_image.stokes_u = output_stacked[2][0]
@@ -1369,7 +1377,7 @@ class ModelFits(TabbedPanel):
         elif self.ids.stack_pol_check.active:
             output_stacked=stack_pol_fits(files_to_stack,weighted=weighted,align=align,stokes_u_fits=files_to_stack_u,stokes_q_fits=files_to_stack_q)
             #create new image data with header info from first fits file
-            stack_image = ImageData(files_to_stack[0],pol_from_stokes=False)
+            stack_image = ImageData(files_to_stack[0],pol_from_stokes=False,noise_method=self.noise_method)
             stack_image.Z = output_stacked[0][0]
             if len(output_stacked) > 1:  # check for polarization
                 stack_image.lin_pol = output_stacked[1][0]
@@ -1377,7 +1385,7 @@ class ModelFits(TabbedPanel):
         #create plot
         self.final_stack_image=stack_image
         self.ids.stacked_image_i.state="down"
-        StackPlot = FitsImage(stack_image,title="Stacked Image")
+        StackPlot = FitsImage(stack_image,title="Stacked Image",noise_method=self.noise_method)
         self.ids.stacked_image.figure = StackPlot.fig
 
     def change_final_stack_plot(self,mode,button):
@@ -1394,7 +1402,8 @@ class ModelFits(TabbedPanel):
                 plot_evpa=False
                 evpa_color="white"
                 contour_color="grey"
-            StackPlot = FitsImage(self.final_stack_image,plot_mode=mode,plot_evpa=plot_evpa,evpa_color=evpa_color,contour_color=contour_color,title="Stacked Image")
+            StackPlot = FitsImage(self.final_stack_image,plot_mode=mode,plot_evpa=plot_evpa,evpa_color=evpa_color,
+                                  contour_color=contour_color,title="Stacked Image",noise_method=self.noise_method)
             self.ids.stacked_image.figure = StackPlot.fig
             button.state="down"
 
@@ -1433,12 +1442,12 @@ class ModelFits(TabbedPanel):
                 stokes_q_path = ""
 
             try:# import CASA STYLE models
-                ImageData(self.casa_clean_model_filepaths[ind],model_save_dir="tmp/",is_casa_model=True)
+                ImageData(self.casa_clean_model_filepaths[ind],model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method)
             except:
                 pass
-            plot_data=ImageData(clean_path,model=model_path,stokes_q=stokes_q_path,stokes_u=stokes_u_path)
+            plot_data=ImageData(clean_path,model=model_path,stokes_q=stokes_q_path,stokes_u=stokes_u_path,noise_method=self.noise_method)
             self.plotting_single_plots_data.append(plot_data)
-            plot=FitsImage(plot_data)
+            plot=FitsImage(plot_data,noise_method=self.noise_method)
             self.plotting_single_plots.append(plot)
 
             button = ToggleButton(
@@ -1531,7 +1540,8 @@ class ModelFits(TabbedPanel):
                                                         evpa_color = self.ids.evpa_color.text,
                                                         title = self.ids.title.text,
                                                         background_color=self.ids.background_color.text,
-                                                        rcparams = self.ids.rcparams.text)
+                                                        rcparams = self.ids.rcparams.text,
+                                                        noise_method=self.noise_method)
 
         #find active button
         active_button = next((t for t in ToggleButton.get_widgets('plotting_single_plots') if t.state == 'down'), None)
@@ -1559,6 +1569,7 @@ class VCAT(App):
 
     def build(self):
         self.screen=ModelFits()
+        self.screen.noise_method=self.screen.ids.noise_method.text
         return self.screen
 
     #### START OF KINEMATIC FUNCTIONS
