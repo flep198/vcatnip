@@ -16,6 +16,8 @@ from astropy.time import Time
 import sys
 import pexpect
 from datetime import datetime
+from scipy.ndimage import gaussian_filter
+
 
 #optimized draw on Agg backend
 mpl.rcParams['path.simplify'] = True
@@ -736,6 +738,7 @@ def get_sigma_levs(image,  # 2d array/list
         levs = np.concatenate((levs, levs1))
 
 
+
     return levs, levs1
 
 #gets components from .fits file
@@ -985,7 +988,7 @@ def get_noise_from_residual_map(residual_fits, center_x, center_y, x_width, y_wi
     x_min=np.argmin(abs(residual_map.X*scale-(center_x+x_width/2)))
     y_max=np.argmin(abs(residual_map.Y*scale-(center_y+y_width/2)))
 
-    return np.std(data[x_min:x_max,y_min:y_max]) #TODO check order of x/y here and if STD! is the correct thing to do!!!
+    return np.average(data[x_min:x_max,y_min:y_max]) #TODO check order of x/y here and if AVERAGE is the correct thing to do!!!
 
 #returns the reduced chi-square of a modelfit
 def get_model_chi_square_red(uvf_file,mod_file,difmap_path):

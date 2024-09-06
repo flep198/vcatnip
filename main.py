@@ -499,10 +499,14 @@ class ModelFits(TabbedPanel):
 
 
 
-    def add_component(self):
-        count= len(self.components)
-        while "Component " + str(count) in self.components:
-            count+=1
+    def add_component(self,number=-1):
+        if number == -1:
+            count = len(self.components)
+            while "Component " + str(count) in self.components:
+                count += 1
+        else:
+            count=number
+
         self.components.append("Component " + str(count))
 
         component_box=BoxLayout(
@@ -752,6 +756,7 @@ class ModelFits(TabbedPanel):
                 final_mf_fits.append(collections)
 
             values = []
+
             #calculate core shift for selected components and plot it
             for i in range(len(final_mf_fits)):
 
@@ -767,7 +772,7 @@ class ModelFits(TabbedPanel):
                             if isinstance(child2,ToggleButton):
                                 if "Component "+str(i) in child2.text:
                                     use2 = True
-                            use= use1 and use2
+                            use = use1 and use2
 
                 #cast list to float
                 frequencies=[float(frequency) for frequency in frequencies]
@@ -1057,8 +1062,8 @@ class ModelFits(TabbedPanel):
             #add components
             comp_info=pd.read_csv(directory[0]+"/component_info.csv")
             ncomps=len(np.unique(comp_info[comp_info["component_number"]>=0]["component_number"]))
-            for i in range(ncomps):
-                self.add_component()
+            for i in np.unique(comp_info[comp_info["component_number"]>=0]["component_number"]):
+                self.add_component(number=i)
 
             #set core
             core_ind=comp_info[comp_info["is_core"]==True]["component_number"].values[0]
@@ -1074,11 +1079,12 @@ class ModelFits(TabbedPanel):
             #now identify them with each other
             for plot in self.plots:
                 for comp in plot.components:
-                    #print(comp[1].get_info())
+                    print(comp[1].get_info())
                     try:
                         #match plot component with component in list
                         filter_df=comp_info[(round(comp_info["x"],15)==round(comp[1].x,15))]
                         ind=filter_df[round(comp_info["y"],15)==round(comp[1].y,15)]["component_number"].values[0]
+                        print(ind)
                     except:
                         ind=-1
                     if ind>=0: #only do this if component was assigned

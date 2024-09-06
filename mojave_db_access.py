@@ -215,14 +215,15 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path,fol
             epoch = epoch_new
         except:
             pass
+
         #now create component info dataframe
         try:
-            if index==0:
-                df_comp = getComponentInfo(foldername+"/"+filename+".fits")
-            else:
-                df_comp = pd.concat([df_comp, getComponentInfo(foldername+"/"+filename+".fits")],ignore_index=True)
+            df_comp = pd.concat([df_comp, getComponentInfo(foldername+"/"+filename+".fits")],ignore_index=True)
         except:
-            pass
+            try:
+                df_comp = getComponentInfo(foldername+"/"+filename+".fits")
+            except:
+                pass
 
         os.chdir("..")
 
