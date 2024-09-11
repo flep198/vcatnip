@@ -134,6 +134,7 @@ class ImageData(object):
                  model_save_dir="tmp/mod_files_model/",
                  is_casa_model=False,
                  noise_method="Image RMS", #choose noise method
+                 correct_rician_bias=False,
                  difmap_path=""):
 
         self.file_path = fits_file
@@ -390,6 +391,11 @@ class ImageData(object):
         except:
             self.integrated_pol_flux_clean=0
 
+        #correct rician bias
+        if correct_rician_bias:
+            lin_pol_sqr = (self.lin_pol ** 2 - self.pol_noise ** 2)
+            lin_pol_sqr[lin_pol_sqr < 0.0] = 0.0
+            self.lin_pol = np.sqrt(lin_pol_sqr)
 
 
 class FitsImage(object):
@@ -691,6 +697,8 @@ class FitsImage(object):
             cbar.set_label(label)
 
         else:
+            if im_color=="":
+                im_color="inferno"
             col = self.ax.imshow(Z, cmap=im_color, norm=colors.SymLogNorm(linthresh=abs(levs1[0]), linscale=0.5, vmin=levs1[0],
                                                                         vmax=0.5 * np.max(Z), base=10.), extent=extent,
                                 origin='lower')

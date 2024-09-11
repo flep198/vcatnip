@@ -431,6 +431,18 @@
             Label:
                 text: ''
                 size_hint_x: 0.2
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: "Correct Rician Bias (not implemented)"
+                size_hint_x: 0.2
+            CheckBox:
+                id: correct_rician_bias
+                size_hint_x: 0.4
+            Label:
+                text: ''
+                size_hint_x: 0.2
     TabbedPanelItem:
         text: 'Kinematics'
         background_color: (1, .5, 0, 1)
@@ -1020,7 +1032,7 @@
                             text: "Colormap"
                         TextInput:
                             id: im_color
-                            text: 'inferno'
+                            text: ''
                     Label:
                         text: ''
                         size_hint_y: 0.1
