@@ -617,7 +617,7 @@ class FitsImage(object):
             vmin=0
             vmax = np.max([0.1, np.min([0.8, np.max(Z)*.8/.7])])
 
-            if im_color == "inferno" or "":
+            if im_color == "":
                 im_color = cmaps.neon_r
 
             if vmax > 0.4:
@@ -664,6 +664,31 @@ class FitsImage(object):
                 cbar = self.fig.colorbar(col, use_gridspec=True, cax=cax)
                 cbar.set_label(label)
             cbar.ax.yaxis.set_minor_formatter(ticker.NullFormatter())
+        elif label=="Linear Polarized Intensity [Jy/beam]":
+            if im_color =="":
+                im_color = "cubehelix_r"
+                #
+                # define linthresh at which Stoke-I scale becomes linear
+            linthresh = 10.0 * levs1[0]
+                #
+                # set plotting limits
+            vmax = np.max([np.max(Z), 10.0 * levs1[0]])
+            vmin = 0
+            if linthresh < 0.5 * np.max([vmax, -vmin]):
+                col = self.ax.imshow(Z,
+                               origin='lower',
+                               cmap=im_color,
+                               norm=colors.SymLogNorm(linthresh=linthresh,
+                                                       vmax=vmax, vmin=vmin),extent=extent)
+            else:
+                col = self.ax.imshow(Z,
+                               origin='lower',
+                               cmap=im_color,
+                               vmax=vmax, vmin=vmin,extent=extent)
+            divider = make_axes_locatable(self.ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            cbar = self.fig.colorbar(col, use_gridspec=True, cax=cax)
+            cbar.set_label(label)
 
         else:
             col = self.ax.imshow(Z, cmap=im_color, norm=colors.SymLogNorm(linthresh=abs(levs1[0]), linscale=0.5, vmin=levs1[0],
