@@ -16,7 +16,8 @@ from astropy.time import Time
 import sys
 import pexpect
 from datetime import datetime
-from scipy.ndimage import gaussian_filter
+import colormaps as cmaps
+import matplotlib.ticker as ticker
 
 
 #optimized draw on Agg backend
@@ -501,7 +502,7 @@ class FitsImage(object):
                 plot_frac_pol = np.ma.masked_where((plot_lin_pol < levs1_linpol[0]) | (self.clean_image.Z<levs1[0]),
                                                   plot_frac_pol)
 
-                self.plotColormap(plot_frac_pol,im_color,np.zeros(100),[0.01],extent,
+                self.plotColormap(plot_frac_pol,im_color,np.zeros(100),[0.00],extent,
                                   label="Fractional Linear Polarization")
 
         if plot_evpa and np.sum(self.clean_image.lin_pol)!=0:
@@ -610,13 +611,72 @@ class FitsImage(object):
                      extent, #plot lims x_min,x_max,y_min,y_max
                      label="Flux Density [Jy]" #label for colorbar
                      ):
-        col = self.ax.imshow(Z, cmap=im_color, norm=colors.SymLogNorm(linthresh=levs1[0], linscale=0.5, vmin=levs1[0],
-                                                                      vmax=0.5 * np.max(Z), base=10.), extent=extent,
-                             origin='lower')
-        divider = make_axes_locatable(self.ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        cbar = self.fig.colorbar(col, use_gridspec=True, cax=cax)
-        cbar.set_label(label)
+
+        #OPTIONS for fractional polarization plot
+        if label=="Fractional Linear Polarization":
+            vmin=0
+            vmax = np.max([0.1, np.min([0.8, np.max(Z)*.8/.7])])
+
+            if im_color == "inferno" or "":
+                im_color = cmaps.neon_r
+
+            if vmax > 0.4:
+                col = self.ax.imshow(Z,
+                               origin='lower',
+                               cmap=im_color,
+                               norm=colors.SymLogNorm(linthresh=0.4,
+                                                       vmax=vmax, vmin=vmin), extent=extent)
+            else:
+                col = self.ax.imshow(Z,
+                               origin='lower',
+                               cmap=im_color,
+                               vmax=vmax, vmin=vmin, extent=extent)
+            if vmax >= 0.4:
+                ticks = np.array([0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4])
+                ticklabels = ["0.0", "", "0.1", "", "0.2", "", "0.3", "", "0.4"]
+                # add appropriate ticklabels up to 0.7.
+                for tickval in ["0.5", "0.6", "0.7","0.8"]:
+                    if vmax >= float(tickval):
+                        ticks = np.append(ticks, float(tickval))
+                        ticklabels.append(tickval)
+                divider = make_axes_locatable(self.ax)
+                cax = divider.append_axes("right", size="5%", pad=0.05)
+                cbar = self.fig.colorbar(col, use_gridspec=True, cax=cax,ticks=ticks)
+                cbar.set_label(label)
+                cbar.ax.set_yticklabels(ticklabels)
+            elif vmax <=0.2:
+                ticks = np.array([0.0, 0.025, 0.05, 0.75, 0.1, 0.125, 0.15, 0.175, 0.2])
+                ticklabels = ["0.000", "0.025", "0.050", "0.075", "0.100", "0.125", "0.150", "0.175", "0.200"]
+                final_labels=[]
+                final_ticks=[]
+                for tickval in ticks:
+                    if vmax >= float(tickval):
+                        final_ticks = np.append(final_ticks, float(tickval))
+                        final_labels.append(tickval)
+                divider = make_axes_locatable(self.ax)
+                cax = divider.append_axes("right", size="5%", pad=0.05)
+                cbar = self.fig.colorbar(col, use_gridspec=True, cax=cax,ticks=final_ticks)
+                cbar.set_label(label)
+                cbar.ax.set_yticklabels(final_labels)
+            else:
+                divider = make_axes_locatable(self.ax)
+                cax = divider.append_axes("right", size="5%", pad=0.05)
+                cbar = self.fig.colorbar(col, use_gridspec=True, cax=cax)
+                cbar.set_label(label)
+            cbar.ax.yaxis.set_minor_formatter(ticker.NullFormatter())
+
+        else:
+            col = self.ax.imshow(Z, cmap=im_color, norm=colors.SymLogNorm(linthresh=abs(levs1[0]), linscale=0.5, vmin=levs1[0],
+                                                                        vmax=0.5 * np.max(Z), base=10.), extent=extent,
+                                origin='lower')
+
+
+            divider = make_axes_locatable(self.ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            cbar = self.fig.colorbar(col, use_gridspec=True, cax=cax)
+            cbar.set_label(label)
+
+
 
     def plotComponent(self,x,y,maj,min,pos,scale):
 
@@ -721,10 +781,10 @@ def get_sigma_levs(image,  # 2d array/list
         noise = t.stddev.value
 
         # Set contourlevels to mean value + 3 * rms_noise * 2 ** x
-        levs1 = t.mean.value + np.min(Z1) - 10 ** (-5) + sigma_contour_limit * t.stddev.value * np.logspace(0, 100, 100,
+        levs1 = t.mean.value + np.min(Z1) - 10 ** (-5) + sigma_contour_limit * noise * np.logspace(0, 100, 100,
                                                                                                             endpoint=False,
                                                                                                             base=2)
-        levs = t.mean.value + np.min(Z1) - 10 ** (-5) - sigma_contour_limit * t.stddev.value * np.logspace(0, 100, 100,
+        levs = t.mean.value + np.min(Z1) - 10 ** (-5) - sigma_contour_limit * noise * np.logspace(0, 100, 100,
                                                                                                            endpoint=False,
                                                                                                            base=2)
         levs = np.flip(levs)
@@ -1019,3 +1079,33 @@ def get_model_chi_square_red(uvf_file,mod_file,difmap_path):
 
     os.system("rm -rf difmap.log")
     return chi_sq_red
+
+
+def format_scientific(number):
+    # Format number in scientific notation
+    sci_str = "{:.0e}".format(number)
+
+    # Split into mantissa and exponent
+    mantissa, exp = sci_str.split('e')
+
+    # Convert exponent to integer
+    exp = int(exp)
+
+    # Unicode superscript mapping
+    superscript = {
+        '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+        '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+    }
+
+    # Handle negative exponents
+    if exp < 0:
+        exp_str = '⁻' + ''.join(superscript.get(digit, digit) for digit in str(abs(exp)))
+    else:
+        exp_str = ''.join(superscript.get(digit, digit) for digit in str(exp))
+
+    # Format the result
+    result = f"{mantissa} × 10{exp_str}"
+
+    return result
+
+
