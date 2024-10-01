@@ -8,7 +8,7 @@
         FileChooser:
             id: filechooser
             multiselect: True
-            path: "/home/flep98/Desktop/PhD_Project/"
+            path: app.screen.ids.default_file_path.text
             FileChooserIconLayout
 
         BoxLayout:
@@ -413,7 +413,7 @@
             Spinner:
                 text: 'Lin. Fit Distance to Core'
                 id: kinematic_fit_method
-                values: ['Lin. Fit Distance to Core', 'Lin. Fit of X and Y separately']
+                values: ['Lin. Fit Distance to Core', 'Lin. Fit of X and Y separately (not implemented)']
                 size_hint_x: 0.4
             Label:
                 text: ''
@@ -425,7 +425,7 @@
                 text: "Default File Path"
                 size_hint_x: 0.2
             TextInput:
-                text: ''
+                text: '/home/'
                 id: default_file_path
                 size_hint_x: 0.4
             Label:
