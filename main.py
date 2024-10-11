@@ -340,7 +340,7 @@ class ModelFits(TabbedPanel):
                 else:
                     plot_data = ImageData(clean_files_to_plot[ind], model=filepath, uvf_file=uvf_files_to_plot[ind],
                                           difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
-                plot=FitsImage(plot_data,overplot_gauss=True,noise_method=self.noise_method)
+                plot=FitsImage(plot_data,overplot_gauss=True)
                 fits_images=np.append(fits_images,plot)
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
             if warn_uvf:
@@ -358,7 +358,7 @@ class ModelFits(TabbedPanel):
                 else:
                     plot_data = ImageData(filepath, model=filepath, uvf_file=uvf_files_to_plot[ind],
                                           difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
-                plot = FitsImage(plot_data,overplot_gauss=True,noise_method=self.noise_method)
+                plot = FitsImage(plot_data,overplot_gauss=True)
                 fits_images = np.append(fits_images, plot)
             self.show_popup("Warning",
                             "No clean images imported, using only modelfit images.\n Have fun doing kinematics!",
@@ -442,7 +442,7 @@ class ModelFits(TabbedPanel):
                         plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],
                                             noise_method=self.noise_method)
 
-            plot = FitsImage(plot_data, overplot_gauss=True,noise_method=self.noise_method)
+            plot = FitsImage(plot_data, overplot_gauss=True)
             #create Figure
             new_figure = MatplotFigure(size_hint_x=None,
                                        width=100)
@@ -1166,16 +1166,16 @@ class ModelFits(TabbedPanel):
                     model=self.modelfit_filepaths[ind]
                 else:
                     model=""
-                plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind])
-                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey",noise_method=self.noise_method)
+                plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind],noise_method=self.noise_method)
+                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
             else:
                 #try to load model from clean .fits file
                 if len(self.modelfit_filepaths)>ind:
                     model=self.modelfit_filepaths[ind]
                 else:
                     model=""
-                plot_data=ImageData(file,model=model)
-                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey",noise_method=self.noise_method)
+                plot_data=ImageData(file,model=model,noise_method=self.noise_method)
+                image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
 
             #check if polarization information was given:
             if np.sum(image.clean_image.stokes_q)==0 or np.sum(image.clean_image.stokes_u)==0:
@@ -1391,7 +1391,7 @@ class ModelFits(TabbedPanel):
         #create plot
         self.final_stack_image=stack_image
         self.ids.stacked_image_i.state="down"
-        StackPlot = FitsImage(stack_image,title="Stacked Image",noise_method=self.noise_method)
+        StackPlot = FitsImage(stack_image,title="Stacked Image")
         self.ids.stacked_image.figure = StackPlot.fig
 
     def change_final_stack_plot(self,mode,button):
@@ -1409,7 +1409,7 @@ class ModelFits(TabbedPanel):
                 evpa_color="white"
                 contour_color="grey"
             StackPlot = FitsImage(self.final_stack_image,plot_mode=mode,plot_evpa=plot_evpa,evpa_color=evpa_color,
-                                  contour_color=contour_color,title="Stacked Image",noise_method=self.noise_method)
+                                  contour_color=contour_color,title="Stacked Image")
             self.ids.stacked_image.figure = StackPlot.fig
             button.state="down"
 
@@ -1453,7 +1453,7 @@ class ModelFits(TabbedPanel):
                 pass
             plot_data=ImageData(clean_path,model=model_path,stokes_q=stokes_q_path,stokes_u=stokes_u_path,noise_method=self.noise_method)
             self.plotting_single_plots_data.append(plot_data)
-            plot=FitsImage(plot_data,noise_method=self.noise_method)
+            plot=FitsImage(plot_data)
             self.plotting_single_plots.append(plot)
 
             button = ToggleButton(
@@ -1547,7 +1547,7 @@ class ModelFits(TabbedPanel):
                                                         title = self.ids.title.text,
                                                         background_color=self.ids.background_color.text,
                                                         rcparams = self.ids.rcparams.text,
-                                                        noise_method=self.noise_method)
+                                                        )
 
         #find active button
         active_button = next((t for t in ToggleButton.get_widgets('plotting_single_plots') if t.state == 'down'), None)

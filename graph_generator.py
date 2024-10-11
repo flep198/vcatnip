@@ -304,12 +304,13 @@ class ImageData(object):
             self.difmap_noise = float(hdu_list[0].header["NOISE"])
         except:
             self.difmap_noise = 0
+        
 
-        try:
-            self.difmap_pol_noise = float(np.sqrt(fits.open(stokes_q)[0].header["NOISE"]**2+fits.open(stokes_u)[0].header["NOISE"]))
-        except:
+        if True:
+            self.difmap_pol_noise = np.sqrt(float(fits.open(stokes_q_path)[0].header["NOISE"])**2+float(fits.open(stokes_u_path)[0].header["NOISE"])**2)
+        else:
             self.difmap_pol_noise = 0
-
+    
         #calculate image noise according to the method selected
         unused, levs_i = get_sigma_levs(self.Z, 1,noise_method=self.noise_method,noise=self.difmap_noise) #get noise for stokes i
         try:
