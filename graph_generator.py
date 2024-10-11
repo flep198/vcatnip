@@ -300,18 +300,27 @@ class ImageData(object):
 
         self.date = get_date(fits_file)
 
+        try:
+            self.difmap_noise = float(hdu_list[0].header["NOISE"])
+        except:
+            self.difmap_noise = 0
+
+        try:
+            self.difmap_pol_noise = float(np.sqrt(fits.open(stokes_q)[0].header["NOISE"]**2+fits.open(stokes_u)[0].header["NOISE"]))
+        except:
+            self.difmap_pol_noise = 0
 
         #calculate image noise according to the method selected
-        unused, levs_i = get_sigma_levs(self.Z, 1,noise_method=self.noise_method) #get noise for stokes i
+        unused, levs_i = get_sigma_levs(self.Z, 1,noise_method=self.noise_method,noise=self.difmap_noise) #get noise for stokes i
         try:
-            unused, levs_pol = get_sigma_levs(self.lin_pol, 1,noise_method=self.noise_method) #get noise for polarization
+            unused, levs_pol = get_sigma_levs(self.lin_pol, 1,noise_method=self.noise_method,noise=self.difmap_noise) #get noise for polarization
         except:
             levs_pol=[0]
 
         # calculate image noise
-        unused, levs_i_3sigma = get_sigma_levs(self.Z, 3,noise_method=self.noise_method)  # get noise for stokes i
+        unused, levs_i_3sigma = get_sigma_levs(self.Z, 3,noise_method=self.noise_method,noise=self.difmap_noise)  # get noise for stokes i
         try:
-            unused, levs_pol_3sigma = get_sigma_levs(self.lin_pol, 3,noise_method=self.noise_method)  # get noise for polarization
+            unused, levs_pol_3sigma = get_sigma_levs(self.lin_pol, 3,noise_method=self.noise_method,noise=self.difmap_noise)  # get noise for polarization
         except:
             levs_pol_3sigma = [0]
 
@@ -487,7 +496,7 @@ class FitsImage(object):
         clean_alpha = 1  # float for sympol transparency
 
         #get sigma levs
-        levs, levs1 = get_sigma_levs(Z,stokes_i_sigma_cut,noise_method=self.noise_method)
+        levs, levs1 = get_sigma_levs(Z,stokes_i_sigma_cut,noise_method=self.noise_method,noise=self.clean_image.difmap_noise)
 
         # Image colormap
         if self.im_colormap == True and plot_mode=="stokes_i":
@@ -497,7 +506,7 @@ class FitsImage(object):
 
         if (plot_mode=="lin_pol" or plot_mode=="frac_pol") and np.sum(self.clean_image.lin_pol)!=0:
 
-            levs_linpol, levs1_linpol = get_sigma_levs(self.clean_image.lin_pol, lin_pol_sigma_cut,noise_method=self.noise_method)
+            levs_linpol, levs1_linpol = get_sigma_levs(self.clean_image.lin_pol, lin_pol_sigma_cut,noise_method=self.noise_method,noise=self.clean_image.difmap_pol_noise)
 
             if plot_mode=="lin_pol":
                 self.plotColormap(self.clean_image.lin_pol,im_color,levs_linpol,levs1_linpol,extent,
@@ -512,7 +521,7 @@ class FitsImage(object):
                                   label="Fractional Linear Polarization")
 
         if plot_evpa and np.sum(self.clean_image.lin_pol)!=0:
-            levs_linpol, levs1_linpol = get_sigma_levs(self.clean_image.lin_pol, lin_pol_sigma_cut,noise_method=self.noise_method)
+            levs_linpol, levs1_linpol = get_sigma_levs(self.clean_image.lin_pol, lin_pol_sigma_cut,noise_method=self.noise_method,noise=self.clean_image.difmap_pol_noise)
             self.plotEvpa(self.clean_image.evpa, rotate_evpa, evpa_len, evpa_distance, levs1_linpol, levs1)
 
         # Contour plot
@@ -800,6 +809,7 @@ class FitsImage(object):
 def get_sigma_levs(image,  # 2d array/list
                    sigma_contour_limit=3, # choose the lowest sigma contour to plot
                    noise_method="Image RMS",
+                   noise=0,
                    ):
     if noise_method=="Histogram Fit":
         Z1 = image.flatten()
@@ -826,6 +836,11 @@ def get_sigma_levs(image,  # 2d array/list
     elif noise_method=="Image RMS":
         Z1 = image.flatten()
         noise = np.std(Z1)
+        levs1 = sigma_contour_limit * noise * np.logspace(0, 100, 100, endpoint=False, base=2)
+        levs = np.flip(-levs1)
+        levs = np.concatenate((levs, levs1))
+
+    elif noise_method=="DIFMAP":
         levs1 = sigma_contour_limit * noise * np.logspace(0, 100, 100, endpoint=False, base=2)
         levs = np.flip(-levs1)
         levs = np.concatenate((levs, levs1))
