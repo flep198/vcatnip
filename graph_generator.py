@@ -306,9 +306,9 @@ class ImageData(object):
             self.difmap_noise = 0
         
 
-        if True:
+        try:
             self.difmap_pol_noise = np.sqrt(float(fits.open(stokes_q_path)[0].header["NOISE"])**2+float(fits.open(stokes_u_path)[0].header["NOISE"])**2)
-        else:
+        except:
             self.difmap_pol_noise = 0
     
         #calculate image noise according to the method selected
@@ -421,7 +421,7 @@ class FitsImage(object):
                  contour_cmap = None,  # matplotlib colormap string
                  contour_alpha = 1,  # transparency
                  contour_width = 0.5,  # contour linewidth
-                 im_color='inferno', # string for matplotlib colormap
+                 im_color='', # string for matplotlib colormap
                  plot_beam=True, #choose whether to plot beam or not
                  overplot_gauss=False, #choose whether to plot modelfit components
                  component_color="black", # choose component color for Gauss component
@@ -438,8 +438,7 @@ class FitsImage(object):
                  evpa_color="white", # set EVPA color for plot
                  title="", # plot title (default is date)
                  background_color="white", #background color
-                 rcparams={}, # option to modify matplotlib look
-                 noise_method="Image RMS" #choose noise_method
+                 rcparams={} # option to modify matplotlib look
                  ):
 
         super().__init__()
@@ -469,7 +468,7 @@ class FitsImage(object):
         beam_pa = self.clean_image.beam_pa
         self.evpa_color=evpa_color
         self.background_color=background_color
-        self.noise_method=noise_method
+        self.noise_method=self.clean_image.noise_method
 
         #plot limits
         ra_max,ra_min,dec_min,dec_max=extent
@@ -683,11 +682,9 @@ class FitsImage(object):
         elif label=="Linear Polarized Intensity [Jy/beam]":
             if im_color =="":
                 im_color = "cubehelix_r"
-                #
-                # define linthresh at which Stoke-I scale becomes linear
+
             linthresh = 10.0 * levs1[0]
-                #
-                # set plotting limits
+
             vmax = np.max([np.max(Z), 10.0 * levs1[0]])
             vmin = 0
             if linthresh < 0.5 * np.max([vmax, -vmin]):
