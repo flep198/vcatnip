@@ -68,21 +68,21 @@ class Component():
 
 
         #check if component is resolved or not:
-        if (self.res_lim_min>self.min*scale) or (self.res_lim_maj>self.maj*scale):
+        if (self.res_lim_min>self.min) or (self.res_lim_maj>self.maj):
             if is_circular:
                 maj_for_tb = self.res_lim_maj
                 min_for_tb = self.res_lim_maj
             else:
-                maj_for_tb = np.max(np.array([self.res_lim_maj, self.maj * scale]))
-                min_for_tb = np.max(np.array([self.res_lim_min, self.min * scale]))
+                maj_for_tb = np.max(np.array([self.res_lim_maj, self.maj]))
+                min_for_tb = np.max(np.array([self.res_lim_min, self.min]))
             self.tb_lower_limit=True
         else:
             self.tb_lower_limit=False
-            maj_for_tb = self.maj * scale
-            min_for_tb = self.min * scale
+            maj_for_tb = self.maj
+            min_for_tb = self.min
 
-        maj_for_tb=np.max(np.array([self.res_lim_maj,self.maj*scale]))
-        min_for_tb=np.max(np.array([self.res_lim_min,self.min*scale]))
+        maj_for_tb=np.max(np.array([self.res_lim_maj,self.maj]))
+        min_for_tb=np.max(np.array([self.res_lim_min,self.min]))
 
         self.tb = 1.22e12/(self.freq*1e-9)**2 * self.flux * (1 + self.redshift) / maj_for_tb / min_for_tb   #Kovalev et al. 2005
         self.scale = scale
