@@ -624,7 +624,7 @@ class FitsImage(object):
                      levs, #sigma levs output
                      levs1, #sigma levs output
                      extent, #plot lims x_min,x_max,y_min,y_max
-                     label="Flux Density [Jy]" #label for colorbar
+                     label="Flux Density [Jy/beam]" #label for colorbar
                      ):
 
         #OPTIONS for fractional polarization plot

@@ -65,8 +65,6 @@ class Component():
             else:
                 self.res_lim_maj, self.res_lim_min=get_resolution_limit(beam_maj,beam_min,beam_pa,pos,flux,noise) #Kovalev et al. 2005
 
-
-
         #check if component is resolved or not:
         if (self.res_lim_min>self.min) or (self.res_lim_maj>self.maj):
             if is_circular:
