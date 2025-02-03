@@ -395,9 +395,9 @@ class ImageData(object):
             self.integrated_flux_clean = 0
         #and then polarization
         try:
-            flux_q=total_flux_from_mod("tmp/mod_files_q/" + self.date + "_" + "{:.0f}".format(self.freq/1e9).replace(".","_") + "GHz.mod")
-            flux_u=total_flux_from_mod("tmp/mod_files_u/" + self.date + "_" + "{:.0f}".format(self.freq/1e9).replace(".","_") + "GHz.mod")
-            self.integrated_pol_flux_clean=np.sqrt(flux_u**2+flux_q**2)
+            flux_q_squared=total_flux_from_mod("tmp/mod_files_q/" + self.date + "_" + "{:.0f}".format(self.freq/1e9).replace(".","_") + "GHz.mod",squared=True)
+            flux_u_squared=total_flux_from_mod("tmp/mod_files_u/" + self.date + "_" + "{:.0f}".format(self.freq/1e9).replace(".","_") + "GHz.mod",squared=True)
+            self.integrated_pol_flux_clean=np.sqrt(flux_u_squared+flux_q_squared)
         except:
             self.integrated_pol_flux_clean=0
 
@@ -1043,13 +1043,16 @@ def get_date(filename):
     return date
 
 #needs a mod_file as input an returns the total flux
-def total_flux_from_mod(mod_file):
+def total_flux_from_mod(mod_file,squared=False):
     lines=open(mod_file).readlines()
     total_flux=0
     for line in lines:
         if not line.startswith("!"):
             linepart=line.split()
-            total_flux+=float(linepart[0])
+            if squard:
+                total_flux+=float(linepart[0])**2
+            else:
+                total_flux+=float(linepart[0])
     return total_flux
                 
 def PXPERBEAM(b_maj,b_min,px_inc):

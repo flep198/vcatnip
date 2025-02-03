@@ -1491,7 +1491,7 @@ class ModelFits(TabbedPanel):
         self.ids.stokes_i_noise.text = "{:.2f}".format(image.noise*1000) + " mJy/beam"
         self.ids.pol_noise.text = "{:.2f}".format(image.pol_noise*1000) + " mJy/beam"
         self.ids.evpa.text = "{:.2f}".format(image.evpa_average/np.pi*180) + "°"
-        self.ids.beam_text.text = "{:.2f}".format(image.beam_maj) + " mas, " + "{:.2f}".format(image.beam_min) + " mas, " + "{:.2f}".format(image.beam_pa)+"°"
+        self.ids.beam_text.text = "{:.2f}".format(image.beam_maj) + " mas x " + "{:.2f}".format(image.beam_min) + " mas, " + "{:.2f}".format(image.beam_pa)+"°"
         if image.integrated_flux_clean!=0:
             self.ids.fractional_polarization.text = (
                     "{:.2f}".format(image.integrated_pol_flux_clean/image.integrated_flux_clean*100)+"%")
