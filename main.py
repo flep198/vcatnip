@@ -7,20 +7,19 @@ from kivy.uix.label import Label
 from kivy.properties import ObjectProperty, StringProperty, ListProperty
 from kivy.uix.button import Button
 from kivy.uix.checkbox import CheckBox
-from kivy.uix.anchorlayout import AnchorLayout
 from graph_widget import MatplotFigure
 from kivy.utils import platform
-from kinematics import ComponentCollection
 import numpy as np
-from graph_generator import FitsImage, ImageData, KinematicPlot, get_date, getComponentInfo
 from astroquery.ipac.ned import Ned
 from astropy.io import fits
 import os
 import pandas as pd
 import glob
-from stack_images import stack_fits, stack_pol_fits, get_common_beam, fold_with_beam
+from vcat.stacking_helpers import stack_fits, stack_pol_fits, fold_with_beam
+from vcat.kinematics import ComponentCollection
+from vcat import FitsImage, ImageData, KinematicPlot
+from vcat.helpers import get_date, getComponentInfo, get_common_beam
 from mojave_db_access import upload_csv_to_MOJAVE, download_kinematic_from_MOJAVE, query_models, check_password
-import subprocess
 
 
 #avoid conflict between mouse provider and touch (very important with touch device)
@@ -280,7 +279,6 @@ class ModelFits(TabbedPanel):
         else:
             output_text="No models found in the MOJAVE DB"
         self.show_popup("Available MOJAVE models",output_text,"Continue")
-
 
 
     def current_color(self,ind):
@@ -714,11 +712,10 @@ class ModelFits(TabbedPanel):
         # find out which plot is currently selected:
         active_button = next((t for t in ToggleButton.get_widgets('kinematic_select') if t.state == 'down'), None)
 
-
         plots_to_fit=self.plots
 
         #check for chi-square plot
-        #TODO Make it seperate for every frequency!!
+        #TODO Make it separate for every frequency!!
         if active_button != None and active_button.text == "Chi-Square":
             self.kplot.plot_chi_square(self.uvf_filepaths, self.modelfit_filepaths, self.ids.difmap_path.text)
 
@@ -866,8 +863,9 @@ class ModelFits(TabbedPanel):
                                           [0, 1.2 * d_max])
 
 
-                fit_data = comp_collection.get_speed()
+
                 if (active_button != None) and (len(collection)>2) and (active_button.text == "Kinematic"):
+                    fit_data = comp_collection.get_speed()[0]
                     self.kplot.plot_linear_fit(t_min-0.1*(t_max-t_min),t_max+0.1*(t_max-t_min),
                                             fit_data["speed"],
                                             fit_data["y0"],self.current_color(i),

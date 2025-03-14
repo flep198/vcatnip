@@ -4,7 +4,7 @@ import numpy as np
 import requests
 import os
 import pexpect
-from graph_generator import getComponentInfo, get_date
+from vcat.helpers import getComponentInfo, get_date
 import subprocess
 from datetime import datetime, timedelta
 import math
