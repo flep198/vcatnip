@@ -17,7 +17,7 @@ import pandas as pd
 import glob
 from vcat.stacking_helpers import stack_fits, stack_pol_fits, fold_with_beam
 from vcat.kinematics import ComponentCollection
-from vcat import FitsImage, ImageData, KinematicPlot
+from vcat import FitsImage, ImageData, KinematicPlot, ImageCube
 from vcat.helpers import get_date, getComponentInfo, get_common_beam
 from mojave_db_access import upload_csv_to_MOJAVE, download_kinematic_from_MOJAVE, query_models, check_password
 
@@ -37,6 +37,13 @@ class FileSavePopup(Popup):
     def load_filepath_to_view(self, selection):
         if selection!=[]:
             self.ids.filename_save.text = str(selection[0])
+
+class ExportMoviePopup(Popup):
+    load = ObjectProperty()
+
+    def load_filepath_to_view(self, selection):
+        if selection!=[]:
+            self.ids.export_movie_save.text = str(selection[0])
 
 class PlotExportPopup(Popup):
     load = ObjectProperty()
@@ -256,6 +263,10 @@ class ModelFits(TabbedPanel):
     def open_save_dialog(self):
         self.save_dialog = FileSavePopup()
         self.save_dialog.open()
+
+    def open_movie_dialog(self):
+        self.movie_dialog = ExportMoviePopup()
+        self.movie_dialog.open()
 
     def open_import_dialog(self):
         self.import_dialog = FileImportPopup()
@@ -720,7 +731,7 @@ class ModelFits(TabbedPanel):
             self.kplot.plot_chi_square(self.uvf_filepaths, self.modelfit_filepaths, self.ids.difmap_path.text)
 
 
-        #calculate Core Shift based on modelfits
+        #calculate Core Shift based on modelfits TODO update this with new capability in VCAT
         if active_button != None and active_button.text == "Core Shift" and len(plots_to_fit)>0:
             t_max=0
             t_min=plots_to_fit[0].components[0][1].year
@@ -1022,6 +1033,86 @@ class ModelFits(TabbedPanel):
         #Optionally export the fits to MOJAVE database
         self.component_info_csv=save_path + '/component_info.csv'
         self.show_mojave_popup()
+
+    #used to export movie from kinematics
+    def save_movie(self,popup,save_text,selection):
+
+        save_path = str(selection[0])
+
+        # set default file name if name was not specified
+        if save_text == str(selection[0]):
+            save_path = save_path + "/movie.mp4"
+        else:
+            save_path = save_text
+
+        #create ImageCube
+        images=[]
+        for plot in self.plots:
+            image_data=plot.clean_image
+            comps=[]
+            for comp in plot.components:
+                comps.append(comp[1])
+            image_data.components=comps
+            images.append(image_data)
+
+        im_cube=ImageCube(images)
+
+        #extract plot settings from popup
+        if popup.ids.movie_plot_mode=="Stokes I":
+            plot_mode="stokes_i"
+        elif popup.ids.movie_plot_mode=="Lin. Pol.":
+            plot_mode="lin_pol"
+        elif popup.ids.movie_plot_mode=="Frac. Pol.":
+            plot_mode="frac_pol"
+        else:
+            plot_mode="stokes_i"
+        #TODO potentially add spix....
+        duration = float(popup.ids.movie_duration.text)
+        fps = float(popup.ids.movie_fps.text)
+
+        interval=int(1000/fps)
+        n_frames=int(fps*duration)
+
+        args={
+            "n_frames": n_frames,
+            "interval": interval,
+            "fps": fps,
+            "freq": popup.ids.movie_freq.text,
+            "plot_mode": plot_mode,
+            "plot_components": popup.ids.movie_overplot_gauss.active,
+            "im_colormap": popup.ids.movie_im_colormap.active,
+            "im_color": popup.ids.movie_im_color.text,
+            "contour": popup.ids.movie_contour.active,
+            "stokes_i_sigma_cut": float(popup.ids.movie_stokes_i_sigma_cut.text),
+            "contour_color": popup.ids.movie_contour_color.text,
+            "contour_cmap": popup.ids.movie_contour_cmap.text,
+            "contour_alpha": float(popup.ids.movie_contour_alpha.text),
+            "contour_width": float(popup.ids.movie_contour_width.text),
+            "component_color": popup.ids.movie_component_color.text,
+            "rcparams": popup.ids.movie_rcparams.text,
+            "background_color": popup.ids.movie_background_color.text,
+            "plot_beam": popup.ids.movie_plot_beam.active,
+            "xlim": [float(popup.ids.movie_ra_max.text),float(popup.ids.movie_ra_min.text)],
+            "ylim": [float(popup.ids.movie_dec_min.text),float(popup.ids.movie_dec_max.text)],
+            "plot_evpa": popup.ids.movie_plot_evpa.active,
+            "rotate_evpa": float(popup.ids.movie_rotate_evpa.text),
+            "evpa_len": float(popup.ids.movie_evpa_len.text),
+            "evpa_distance": float(popup.ids.movie_evpa_distance.text),
+            "evpa_color": popup.ids.movie_evpa_color.text,
+            "evpa_width": float(popup.ids.movie_evpa_width.text),
+            "lin_pol_sigma_cut": float(popup.ids.movie_lin_pol_sigma_cut.text),
+            "save":save_path
+              }
+
+        #Check if we need to convolve with the common beam
+        if popup.ids.movie_convolve.active:
+            im_cube=im_cube.restore()
+
+        #create movie
+        im_cube.movie(**args)
+
+        popup.dismiss()
+
 
     def show_mojave_popup(self):
         self.the_popup = MOJAVEExportPopup()
@@ -1617,6 +1708,9 @@ class VCAT(App):
 
     def save_kinematics(self,save_text,selection):
         self.screen.save_kinematics(save_text,selection)
+
+    def save_movie(self,popup,save_text,selection):
+        self.screen.save_movie(popup,save_text,selection)
 
     def import_kinematics(self,directory):
         self.screen.import_kinematics(directory)

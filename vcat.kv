@@ -60,6 +60,287 @@
                 id: save_button
                 disabled: True if filechooser_save.selection==[] else False
 
+<ExportMoviePopup>:
+    title: "Export Kinematic Movie"
+    size_hint: .9, .9
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "vertical"
+
+        BoxLayout:
+            orientation: "horizontal"
+
+            FileChooser:
+                size_hint: (0.7,1)
+                id: movie_filechooser_save
+                multiselect: False
+                dirselect: True
+                filters: ['']
+                FileChooserIconLayout:
+                    on_touch_down: root.load_filepath_to_view(movie_filechooser_save.selection)
+
+            BoxLayout:
+                orientation: "vertical"
+                size_hint: (0.3,1)
+                Label:
+                    text: "Plot Settings"
+                    size_hint_y:0.1
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Plot Mode"
+                        size_hint_x: 0.5
+                    Spinner:
+                        text: 'Stokes I'
+                        id: movie_plot_mode
+                        size_hint_x: 0.5
+                        values: ['Stokes I', 'Lin. Pol.', 'Frac. Pol.']
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Duration [s]"
+                    TextInput:
+                        id: movie_duration
+                        text: "10"
+                    Label:
+                        text: "FPS"
+                    TextInput:
+                        id: movie_fps
+                        text: "20"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Plot Gauss Modelfit?"
+                    CheckBox:
+                        id: movie_overplot_gauss
+                    Label:
+                        text: "Freq [GHz]"
+                    TextInput:
+                        id: movie_freq
+                        text: ""
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Colormap?"
+                    CheckBox:
+                        id: movie_im_colormap
+                    Label:
+                        text: "Colormap"
+                    TextInput:
+                        id: movie_im_color
+                        text: ''
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Contour?"
+                    CheckBox:
+                        id: movie_contour
+                        active: True
+                    Label:
+                        text: "Sigma Cut (Stokes I)"
+                    TextInput:
+                        id: movie_stokes_i_sigma_cut
+                        text: '3'
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Contour Color"
+                    TextInput:
+                        id: movie_contour_color
+                        text: "black"
+                    Label:
+                        text: "Contour Colormap"
+                    TextInput:
+                        id: movie_contour_cmap
+                        text: ''
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Contour Alpha"
+                    TextInput:
+                        id: movie_contour_alpha
+                        text: "1"
+                    Label:
+                        text: "Contour Width"
+                    TextInput:
+                        id: movie_contour_width
+                        text: '0.5'
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Component Color"
+                    TextInput:
+                        id: movie_component_color
+                        text: "black"
+                    Label:
+                        text: "rcParams"
+                    TextInput:
+                        id: movie_rcparams
+                        text: ''
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Bg Color"
+                    TextInput:
+                        id: movie_background_color
+                        text: "white"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Common beam?"
+                    CheckBox:
+                        id: movie_convolve
+                    Label:
+                        text: "Plot Beam?"
+                    CheckBox:
+                        id: movie_plot_beam
+                        active: True
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "RA min"
+                    TextInput:
+                        id: movie_ra_min
+                    Label:
+                        text: "RA max"
+                    TextInput:
+                        id: movie_ra_max
+                    Label:
+                        text: "DEC min"
+                    TextInput:
+                        id: movie_dec_min
+                    Label:
+                        text: "DEC max"
+                    TextInput:
+                        id: movie_dec_max
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Plot EVPA?"
+                    CheckBox:
+                        id: movie_plot_evpa
+                        active: False
+                    Label:
+                        text: "Rotate EVPA (deg)"
+                    TextInput:
+                        id: movie_rotate_evpa
+                        text: "0"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "EVPA len (pix)"
+                    TextInput:
+                        id: movie_evpa_len
+                        text: "8"
+                    Label:
+                        text: "EVPA dist (pix)"
+                    TextInput:
+                        id: movie_evpa_distance
+                        text: "10"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "EVPA color"
+                    TextInput:
+                        id: movie_evpa_color
+                        text: "white"
+                    Label:
+                        text: "EVPA Width"
+                    TextInput:
+                        id: movie_evpa_width
+                        text: "2"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Lin Pol Sigma Cut"
+                    TextInput:
+                        id: movie_lin_pol_sigma_cut
+                        text: "3"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+        BoxLayout:
+            size_hint: (1, 0.05)
+            pos_hint: {'center_x': .5, 'center_y': .5}
+            spacing: 20
+
+            TextInput:
+                id: export_movie_save
+                height: 30
+                multiline: False
+
+            Button:
+                text: "Cancel"
+                on_release: root.dismiss()
+            Button:
+                text: "Save"
+                on_release:
+                    app.save_movie(root,root.ids.export_movie_save.text,movie_filechooser_save.selection)
+                    root.dismiss()
+                id: movie_save_button
+                disabled: True if movie_filechooser_save.selection==[] else False
+
 <FileImportPopup>:
     title: "Import Kinematic Data"
     size_hint: .9, .9
@@ -444,7 +725,7 @@
                 text: ''
                 size_hint_x: 0.2
     TabbedPanelItem:
-        text: 'Kinematics'
+        text: 'ModelComps'
         background_color: (1, .5, 0, 1)
         background_normal: ''
         BoxLayout:
@@ -521,14 +802,19 @@
                             text:"Import Data"
                             on_release:
                                 root.open_import_dialog()
-                        TextInput:
+                        Button:
                             size_hint_x: 0.2
+                            text: "Export Movie"
+                            on_release:
+                                root.open_movie_dialog()
+                        TextInput:
+                            size_hint_x: 0.1
                             id: redshift
                             text: "0.00"
                             on_text: app.update_redshift()
                             multiline: False
                         Button:
-                            size_hint_x: 0.4
+                            size_hint_x: 0.3
                             text:"Get Redshift from NED"
                             on_release: app.get_redshift()
 
