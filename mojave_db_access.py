@@ -7,7 +7,6 @@ import pexpect
 from vcat.helpers import getComponentInfo, get_date
 import subprocess
 from datetime import datetime, timedelta
-import math
 
 def upload_csv_to_MOJAVE(csv_file,observer,password,source):
     df=pd.read_csv(csv_file)

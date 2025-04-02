@@ -960,7 +960,223 @@
                     id: figures
                     spacing: 50
                     width: self.minimum_width
+    TabbedPanelItem:
+        text: 'ModelFit'
+        background_color: (1, .5, 0, 1)
+        background_normal: ''
+        BoxLayout:
+            id: modelfit_box
+            orientation: 'vertical'
+            Button:
+                text: 'Load Files'
+                size_hint_x: 0.2
+                size_hint_y: 0.05
+                on_release: root.load_modelfit_files()
+            BoxLayout:
+                orientation: 'horizontal'
+                padding: 50
+                BoxLayout:
+                    id: box_left_modelfit
+                    orientation: 'vertical'
+                    padding:20
+                    BoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: 0.1
+                        Label:
+                            text: "File List"
+                            size_hint_x: 1
+                    ScrollView:
+                        size: self.size
+                        size_hint_y: 0.9
+                        id: scroll_files
+                        GridLayout:
+                            size_hint_y: None
+                            cols: 1
+                            id: modelfit_list
+                            height: self.minimum_height
+                BoxLayout:
+                    id: box_center_left_modelfit
+                    orientation: "vertical"
+                    padding: 20
+                    Label:
+                        text: "Modelfit Method"
+                        size_hint_x: 1
+                        size_hint_y: 0.05
+                    Spinner:
+                        text: 'Stokes I/DIFMAP'
+                        id: modelfit_method
+                        values: ['Stokes I/DIFMAP', 'Lin. Pol./ehtim']
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        on_text:
+                            root.change_modelfit_plot()
+                    BoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Modelfit Components"
+                            size_hint_x: 1
+                    ScrollView:
+                        size: self.size
+                        size_hint_y: 0.3
+                        id: scroll_files
+                        GridLayout:
+                            size_hint_y: None
+                            cols: 1
+                            id: modelfit_component_list
+                            height: self.minimum_height
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.05
+                        Button:
+                            text:"Add"
+                            on_release: root.add_modelfit_component()
+                        Button:
+                            text:"Remove"
+                            on_release: root.remove_modelfit_component()
+                        Button:
+                            text:"Load"
+                            on_release: root.load_modelfit_components()
+                        Button:
+                            text:"Update"
+                            on_release: root.update_modelfit_component()
+                    BoxLayout:
+                        size_hint_y: 0.5
+                        orientation: "vertical"
+                        padding: 10
+                        Label:
+                            text: "Component Properties"
+                            size_hint_y:0.1
+                        BoxLayout:
+                            orientation: "horizontal"
+                            size_hint_y: 0.25
+                            Label:
+                                text: "Flux [mJy]"
+                            TextInput:
+                                id: component_flux
+                                text: "1"
+                            Label:
+                                text: "PA [deg]"
+                            TextInput:
+                                id: component_pos
+                                text: "0"
+                        Label:
+                            text: ""
+                            size_hint_y: 0.05
+                        BoxLayout:
+                            orientation: "horizontal"
+                            size_hint_y: 0.25
+                            Label:
+                                text: "Maj [mas]"
+                            TextInput:
+                                id: component_maj
+                                text: "1"
+                            Label:
+                                text: "Min [mas]"
+                            TextInput:
+                                id: component_min
+                                text: "1"
+                        Label:
+                            text: ""
+                            size_hint_y: 0.05
+                        BoxLayout:
+                            orientation: "horizontal"
+                            size_hint_y: 0.25
+                            Label:
+                                text: "X [mas]"
+                            TextInput:
+                                id: component_x
+                                text: "0"
+                            Label:
+                                text: "Y [mas]"
+                            TextInput:
+                                id: component_y
+                                text: "0"
+                        Label:
+                            text: ""
+                            size_hint_y: 0.05
+                        BoxLayout:
+                            orientation: "horizontal"
+                            size_hint_y: 0.25
+                            Label:
+                                text: "Lin Pol [mJy]"
+                            TextInput:
+                                id: component_lin_pol
+                                text: "0"
+                            Label:
+                                text: "EVPA [deg]"
+                            TextInput:
+                                id: component_evpa
+                                text: "0"
+                BoxLayout:
+                    id: box_center_right_modelfit
+                    orientation: "vertical"
+                    padding: 20
+                    BoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: 0.05
+                        Button:
+                            group: "residual_select"
+                            id: add_component_button_residual
+                            text: "Add component"
+                            on_release:
+                                root.set_residual_touch_mode(mode="add_component")
+                                self.state='down'
+                                zoom_mode_button_residual.state="normal"
+                        Button:
+                            text: "Zoom Mode"
+                            id: zoom_mode_button_residual
+                            group: "residual_select"
+                            state: "down"
+                            on_release:
+                                root.set_residual_touch_mode(mode="zoom")
+                                self.state='down'
+                                add_component_button_residual.state="normal"
 
+                    MatplotFigure:
+                        size_hint_y: 0.5
+                        id: modelfit_residual_image
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Button:
+                            text: "modelfit"
+                            size_hint_x: 0.7
+                            size_hint_y: 1
+                            on_release:
+                                root.do_modelfit()
+                        TextInput:
+                            text: "20"
+                            id: modelfit_count
+                            size_hint_x: 0.3
+                            size_hint_y: 1
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Label:
+                            text: "FOV [mas]"
+                        TextInput:
+                            text: ""
+                            id: modelfit_fov
+                        Label:
+                            text: "npix"
+                        TextInput:
+                            text: ""
+                            id: modelfit_npix
+                    BoxLayout:
+                        size_hint_y: 0.40
+                BoxLayout
+                    id: box_right_modelfit
+                    orientation: "vertical"
+                    padding: 20
+                    MatplotFigure:
+                        size_hint_y: 0.5
+                        id: modelfit_image
+                    MatplotFigure:
+                        size_hint_y: 0.5
+                        id: modelfit_radplot
     TabbedPanelItem:
         text: 'Stacking'
         background_color: (1, .5, 0, 1)

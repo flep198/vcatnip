@@ -12,13 +12,15 @@ from kivy.utils import platform
 import numpy as np
 from astroquery.ipac.ned import Ned
 from astropy.io import fits
+from astropy.time import Time
 import os
 import pandas as pd
 import glob
-from vcat.stacking_helpers import stack_fits, stack_pol_fits, fold_with_beam
-from vcat.kinematics import ComponentCollection
+from matplotlib.patches import Ellipse
+from vcat.stacking_helpers import stack_fits, stack_pol_fits, fold_with_beam, modelfit_ehtim, modelfit_difmap
+from vcat.kinematics import ComponentCollection, Component
 from vcat import FitsImage, ImageData, KinematicPlot, ImageCube
-from vcat.helpers import get_date, getComponentInfo, get_common_beam
+from vcat.helpers import get_date, get_common_beam, write_mod_file_from_components, get_residual_map, Jy2JyPerBeam, JyPerBeam2Jy
 from mojave_db_access import upload_csv_to_MOJAVE, download_kinematic_from_MOJAVE, query_models, check_password
 
 
@@ -83,6 +85,13 @@ class ModelFits(TabbedPanel):
     name=""
     component_collections = []
     mojave_password=""
+
+    #### MODELFIT variables
+    modelfit_plots = []
+    modelfit_plot_buttons = []
+    current_modelfit_residual_plot = []
+    new_modelfit_component_coords = []
+    current_new_ellipse_plot = []
 
     #### STACKING variables
     stacking_single_plots = []
@@ -349,7 +358,7 @@ class ModelFits(TabbedPanel):
                 else:
                     plot_data = ImageData(clean_files_to_plot[ind], model=filepath, uvf_file=uvf_files_to_plot[ind],
                                           difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
-                plot=FitsImage(plot_data,overplot_gauss=True)
+                plot=FitsImage(plot_data,plot_model=True)
                 fits_images=np.append(fits_images,plot)
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
             if warn_uvf:
@@ -367,7 +376,7 @@ class ModelFits(TabbedPanel):
                 else:
                     plot_data = ImageData(filepath, model=filepath, uvf_file=uvf_files_to_plot[ind],
                                           difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
-                plot = FitsImage(plot_data,overplot_gauss=True)
+                plot = FitsImage(plot_data,plot_model=True)
                 fits_images = np.append(fits_images, plot)
             self.show_popup("Warning",
                             "No clean images imported, using only modelfit images.\n Have fun doing kinematics!",
@@ -451,7 +460,7 @@ class ModelFits(TabbedPanel):
                         plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],
                                             noise_method=self.noise_method)
 
-            plot = FitsImage(plot_data, overplot_gauss=True)
+            plot = FitsImage(plot_data, plot_model=True)
             #create Figure
             new_figure = MatplotFigure(size_hint_x=None,
                                        width=100)
@@ -1241,6 +1250,398 @@ class ModelFits(TabbedPanel):
 
     #### END OF KINEMATIC FUNCTIONS
 
+    #### START OF MODELFIT FUNCTIONS
+
+    def load_modelfit_files(self):
+
+        # TODO some basic background checks on the files to see if they are valid and if they exist (write some popups)
+        # TODO also check for polarizations. If there is only Stokes I input, grey out the polarization stacking options
+        modelfit_pol_loaded=False
+
+        if len(self.uvf_filepaths) != len(self.clean_filepaths):
+            self.show_popup("Error","Please load an equal number of clean files and .uvf files!","Continue")
+            return 0
+
+        for ind, file in enumerate(self.clean_filepaths):
+            uvf_file = self.uvf_filepaths[ind]
+            if len(self.modelfit_filepaths) > ind:
+                model = self.modelfit_filepaths[ind]
+                plot_model = True
+                plot_comp_ids = True
+            else:
+                model = ""
+                plot_model = False
+                plot_comp_ids = False
+            if len(self.stokes_u_filepaths) > ind and len(self.stokes_q_filepaths) > ind:
+                plot_data = ImageData(file, model=model, uvf_file=uvf_file, stokes_u=self.stokes_u_filepaths[ind],
+                                      stokes_q=self.stokes_q_filepaths[ind], noise_method=self.noise_method)
+                image = FitsImage(plot_data, plot_mode="lin_pol", plot_model=plot_model, plot_comp_ids=plot_comp_ids,
+                                  plot_evpa=True, evpa_color="black", contour_color="grey")
+
+            else:
+                plot_data = ImageData(file, model=model, uvf_file=uvf_file, noise_method=self.noise_method)
+                image = FitsImage(plot_data, plot_mode="lin_pol", plot_model=plot_model, plot_comp_ids=plot_comp_ids,
+                                  plot_evpa=True, evpa_color="black", contour_color="grey")
+
+
+            # check if polarization information was given:
+            if np.sum(image.clean_image.stokes_q) == 0 or np.sum(image.clean_image.stokes_u) == 0:
+                #TODO disable polarization options
+                modelfit_pol_loaded=False
+                pass
+            else:
+                modelfit_pol_loaded=True
+
+            self.modelfit_plots.append(image)
+
+            button = ToggleButton(
+                text=str(get_date(file)),
+                size_hint_y=None,
+                size_hint_x=1,
+                height=50,
+                group="modelfit_plots",
+            )
+            button.bind(on_release=self.change_modelfit_plot)
+
+            self.modelfit_plot_buttons.append(button)
+            self.ids.modelfit_list.add_widget(button)
+
+            # select first button by default
+            try:
+                self.modelfit_plot_buttons[0].state = "down"
+                self.change_modelfit_plot(self.modelfit_plot_buttons[0])
+            except:
+                pass
+        if not modelfit_pol_loaded:
+            self.show_popup("Warning", "Data loaded successfully, \n but no valid polarization data detected",
+                            "Continue")
+        else:
+            self.show_popup("Success", "Loaded data including polarization!", "Continue")
+
+    def change_modelfit_plot(self,button=""):
+        try:
+            ind = np.where(np.array(self.modelfit_plot_buttons) == button)[0][0]
+        except:
+            for i1, but in enumerate(self.ids.modelfit_list.children):
+                i1 = len(self.ids.modelfit_list.children) - 1 - i1
+                if but.state == "down":
+                    ind=i1
+            try:
+                ind
+            except:
+                return None
+
+        self.ids.modelfit_image.figure = self.modelfit_plots[ind].fig
+
+        self.ids.modelfit_component_list.clear_widgets()
+        self.modelfit_component_buttons=[]
+
+        #read out components attached to the ImageData object
+        comps=self.modelfit_plots[ind].clean_image.components
+
+        #add them to the component list
+        for comp in comps:
+            button = ToggleButton(
+                text="Component " + str(comp.component_number),
+                size_hint_y=None,
+                size_hint_x=1,
+                height=50,
+                group="modelfit_components",
+            )
+            button.bind(on_release=self.change_modelfit_component_select)
+
+            self.modelfit_component_buttons.append(button)
+            self.ids.modelfit_component_list.add_widget(button)
+
+        #create temporary working directory
+        os.system("rm -rf " + "/tmp/tmp_data_vcat/")
+        os.makedirs("/tmp/tmp_data_vcat", exist_ok=True)
+
+        if self.ids.modelfit_method.text=="Stokes I/DIFMAP":
+            #write .mod files
+            write_mod_file_from_components(comps,"i","/tmp/tmp_data_vcat/i_model.mod")
+
+            #calculate new residual plot
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file,"/tmp/tmp_data_vcat/i_model.mod",
+                             difmap_path=self.ids.difmap_path.text, save_location="/tmp/tmp_data_vcat/i_res.fits",
+                             npix=len(self.modelfit_plots[ind].clean_image.X)*2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
+
+            #create residual plot
+            res_image = ImageData("/tmp/tmp_data_vcat/i_res.fits")
+            res_image.residual_map = res_image.Z
+            res_plot = res_image.plot(plot_mode="residual",contour=False,title="Residual Map",component_color="green")
+
+            #get current modelfit plot (right)
+            modelfit_image = ImageData(self.modelfit_plots[ind].clean_image.fits_file).plot()
+
+            for comp in comps:
+                res_plot.plotComponent(comp.x,comp.y,comp.maj,comp.min,comp.pos,comp.scale,fillcolor="",id=comp.component_number)
+                modelfit_image.plotComponent(comp.x,comp.y,comp.maj,comp.min,comp.pos,comp.scale,fillcolor="",id=comp.component_number)
+
+        elif self.ids.modelfit_method.text=="Lin. Pol./ehtim":
+            #write .mod files
+            write_mod_file_from_components(comps, "q", "/tmp/tmp_data_vcat/q_model.mod")
+            write_mod_file_from_components(comps, "u", "/tmp/tmp_data_vcat/u_model.mod")
+            #calculate residual maps
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/q_model.mod",difmap_path=self.ids.difmap_path.text,
+                             channel="q", save_location="/tmp/tmp_data_vcat/q_res.fits", npix=len(self.modelfit_plots[ind].clean_image.X)*2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/u_model.mod",difmap_path=self.ids.difmap_path.text,
+                             channel="u", save_location="/tmp/tmp_data_vcat/u_res.fits", npix=len(self.modelfit_plots[ind].clean_image.X)*2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
+
+            #create residual image
+            res_image = ImageData(self.modelfit_plots[ind].clean_image.fits_file,
+                                  stokes_q="/tmp/tmp_data_vcat/q_res.fits", stokes_u="/tmp/tmp_data_vcat/u_res.fits")
+
+            res_plot = res_image.plot(plot_mode="lin_pol", plot_evpa=True,title="Residual Map")
+            # get current modelfit plot (right)
+            modelfit_image = ImageData(self.modelfit_plots[ind].clean_image.fits_file,
+                                       stokes_q=self.modelfit_plots[ind].clean_image.stokes_q_path,
+                                       stokes_u=self.modelfit_plots[ind].clean_image.stokes_u_path).plot(plot_mode="lin_pol",plot_evpa=True)
+
+            for comp in comps:
+                res_plot.plotComponent(comp.x,comp.y,comp.maj,comp.min,comp.pos,comp.scale,fillcolor="",id=comp.component_number,evpa=comp.evpa)
+                modelfit_image.plotComponent(comp.x, comp.y, comp.maj, comp.min, comp.pos, comp.scale, fillcolor="",
+                                       id=comp.component_number, evpa=comp.evpa)
+        #assign image
+        self.ids.modelfit_residual_image.figure = res_plot.fig
+        self.ids.modelfit_image.figure = modelfit_image.fig
+        self.current_modelfit_residual_plot = res_plot
+
+        #TODO also update plot on the right!
+
+    def change_modelfit_component_select(self,button=""):
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1 = len(self.ids.modelfit_list.children) - 1 - i1
+            if but.state=="down":
+                for ind,button in enumerate(self.ids.modelfit_component_list.children):
+                    ind=len(self.ids.modelfit_component_list.children)-1-ind
+                    if button.state == "down":
+                        #find current component
+                        current_comp=self.modelfit_plots[i1].clean_image.components[ind]
+
+                        #set parameters
+                        self.ids.component_flux.text=f"{current_comp.flux*1e3:.2f}"
+                        self.ids.component_pos.text=f"{current_comp.pos:.2f}"
+                        self.ids.component_maj.text=f"{current_comp.maj*current_comp.scale:.2f}"
+                        self.ids.component_min.text=f"{current_comp.min*current_comp.scale:.2f}"
+                        self.ids.component_x.text=f"{current_comp.x*current_comp.scale:.2f}"
+                        self.ids.component_y.text=f"{current_comp.y*current_comp.scale:.2f}"
+                        self.ids.component_lin_pol.text=f"{current_comp.lin_pol*1e3:.2f}"
+                        self.ids.component_evpa.text=f"{current_comp.evpa:.2f}"
+
+    #Function to add new modelfit component
+    def add_modelfit_component(self):
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1 = len(self.ids.modelfit_list.children) - 1 - i1
+            if but.state == "down":
+                image_data=self.modelfit_plots[i1].clean_image
+                self.modelfit_plots[i1].clean_image.components.append(
+                    Component(float(self.ids.component_x.text)/image_data.scale,
+                              float(self.ids.component_y.text)/image_data.scale,
+                              float(self.ids.component_maj.text)/image_data.scale,
+                              float(self.ids.component_min.text)/image_data.scale,
+                              float(self.ids.component_pos.text),
+                              float(self.ids.component_flux.text)*1e-3,
+                              image_data.date,image_data.mjd,Time(image_data.date).decimalyear,
+                              lin_pol=float(self.ids.component_lin_pol.text) * 1e-3,
+                              evpa=float(self.ids.component_evpa.text),
+                              scale=image_data.scale,component_number=len(image_data.components)))
+
+                #reload plots
+                self.change_modelfit_plot(but)
+
+    #Function to remove modelfit component
+    def remove_modelfit_component(self,button=""):
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1 = len(self.ids.modelfit_list.children) - 1 - i1
+            if but.state == "down":
+                for ind,button in enumerate(self.ids.modelfit_component_list.children):
+                    if button.state == "down":
+                        ind = len(self.ids.modelfit_component_list.children) - 1 - ind
+                        self.modelfit_plots[i1].clean_image.components.pop(ind)
+
+                        # reload plots
+                        self.change_modelfit_plot(but)
+
+    def update_modelfit_component(self,button=""):
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1=len(self.ids.modelfit_list.children)-1-i1
+            if but.state == "down":
+                for ind,button in enumerate(self.ids.modelfit_component_list.children):
+                    if button.state == "down":
+                        ind = len(self.ids.modelfit_component_list.children) - 1 - ind
+                        comp=self.modelfit_plots[i1].clean_image.components[ind]
+                        try:
+                            self.modelfit_plots[i1].clean_image.components[ind].flux=float(self.ids.component_flux.text)*1e-3
+                            self.modelfit_plots[i1].clean_image.components[ind].x = float(self.ids.component_x.text)/comp.scale
+                            self.modelfit_plots[i1].clean_image.components[ind].y = float(self.ids.component_y.text)/comp.scale
+                            self.modelfit_plots[i1].clean_image.components[ind].pos = float(self.ids.component_pos.text)
+                            self.modelfit_plots[i1].clean_image.components[ind].maj = float(self.ids.component_maj.text)/comp.scale
+                            self.modelfit_plots[i1].clean_image.components[ind].min = float(self.ids.component_min.text)/comp.scale
+                            self.modelfit_plots[i1].clean_image.components[ind].lin_pol = float(self.ids.component_lin_pol.text)*1e-3
+                            self.modelfit_plots[i1].clean_image.components[ind].evpa = float(self.ids.component_evpa.text)
+                        except:
+                            pass
+                        # reload plots
+                        self.change_modelfit_plot(but)
+
+    #TODO load modelfit from other image as start model
+    def load_modelfit_components(self):
+        pass
+
+    def do_modelfit(self,button=""):
+        #find currently selected image
+        ind=-1
+        final_but=0
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1 = len(self.ids.modelfit_list.children) - 1 - i1
+            if but.state == "down":
+                ind=i1
+                final_but=but
+
+        if ind==-1:
+            self.show_popup("Error","Please select a file from the file list first!", "Continue")
+            return None
+
+        #get current components
+        comps=self.modelfit_plots[ind].clean_image.components
+        if len(comps)==0:
+            self.show_popup("Error", "Please add components first!", "Continue")
+
+        if self.ids.modelfit_method.text=="Stokes I/DIFMAP":
+            self.modelfit_plots[ind].clean_image.components=modelfit_difmap(self.modelfit_plots[ind].clean_image.uvf_file,
+                                                                            comps,int(self.ids.modelfit_count.text),
+                                                                            difmap_path=self.ids.difmap_path.text)
+        elif self.ids.modelfit_method.text=="Lin. Pol./ehtim":
+            self.modelfit_plots[ind].clean_image.components=modelfit_ehtim(self.modelfit_plots[ind].clean_image.uvf_file,
+                                                                           comps,int(self.ids.modelfit_count.text),
+                                                                           npix=self.ids.modelfit_npix.text,
+                                                                           fov=self.ids.modelfit_fov.text)
+
+        self.change_modelfit_plot(final_but)
+
+    def set_residual_touch_mode(self,button="",mode="zoom"):
+        if mode=="zoom":
+            self.ids.modelfit_residual_image.touch_mode="cursor"
+        elif mode=="add_component":
+            self.ids.modelfit_residual_image.touch_mode="ellipseselect"
+            self.new_modelfit_component_coords=[]
+
+
+    def plot_new_modelfit_component(self,xdata,ydata):
+        self.new_modelfit_component_coords.append([xdata,ydata])
+
+        #find currently active plot
+        ind=-1
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1 = len(self.ids.modelfit_list.children) - 1 - i1
+            if but.state == "down":
+                ind = i1
+        if ind==-1:
+            return None
+
+        ax=self.current_modelfit_residual_plot.ax
+
+        n_points=len(self.new_modelfit_component_coords)
+        try:
+            self.current_new_ellipse_plot.remove()
+        except:
+            pass
+        if n_points==1:
+            #plot point
+            self.current_new_ellipse_plot  = ax.scatter(self.new_modelfit_component_coords[0][0],
+                                                        self.new_modelfit_component_coords[0][1])
+            ax.figure.canvas.draw_idle()
+            ax.figure.canvas.flush_events()
+        elif n_points==2:
+            #plot line
+            self.current_new_ellipse_plot,  = ax.plot([self.new_modelfit_component_coords[0][0],
+                                                       self.new_modelfit_component_coords[1][0]],
+                                                       [self.new_modelfit_component_coords[0][1],
+                                                        self.new_modelfit_component_coords[1][1]])
+            ax.figure.canvas.draw_idle()
+            ax.figure.canvas.flush_events()
+        elif n_points==3:
+            # add component as ellipse and empty new_modelfit_component_coords
+            #center of the ellipse
+            center_x, center_y = self.new_modelfit_component_coords[0][0], self.new_modelfit_component_coords[0][1]
+
+            #calculate one axis of the ellipse:
+            maj_x, maj_y = (self.new_modelfit_component_coords[1][0] - center_x ,
+                            self.new_modelfit_component_coords[1][1] - center_y)
+
+            #calculate the second axis of the ellipse
+            min_x, min_y = (self.new_modelfit_component_coords[2][0] - center_x ,
+                            self.new_modelfit_component_coords[2][1] - center_y)
+
+            maj=2*np.sqrt(maj_x**2+maj_y**2)
+            min=2*np.sqrt(min_x**2+min_y**2)
+
+            if maj<min:
+                maj_old=maj
+                maj=min
+                min=maj_old
+
+            #calculate position angle
+            PA=np.arctan2(maj_x,maj_y)/np.pi*180
+
+            if PA<-90:
+                PA+=180
+            elif PA>90:
+                PA-=180
+
+            #plot ellipse
+            self.current_new_ellipse_plot=Ellipse((center_x,center_y),width=maj,height=min,angle=-(PA+90))
+            ax.add_patch(self.current_new_ellipse_plot)
+
+            #modify the text boxes
+            self.ids.component_x.text=f"{center_x:.2f}"
+            self.ids.component_y.text=f"{center_y:.2f}"
+            self.ids.component_maj.text = f"{maj:.2f}"
+            self.ids.component_min.text = f"{min:.2f}"
+            self.ids.component_pos.text = f"{PA:.2f}"
+
+            #extract flux and linpol/EVPA from image within ellipse
+            # Get the indices of the ellipse in image space
+            self.current_modelfit_residual_plot.clean_image.masking(mask_type="reset")
+            self.current_modelfit_residual_plot.clean_image.masking(mask_type="ellipse",
+                                                                    args={'e_args':[maj,min,PA],
+                                                                          'e_xoffset': center_x,'e_yoffset': center_y})
+
+            mask=np.array(self.current_modelfit_residual_plot.clean_image.mask,dtype=bool)
+
+            if self.ids.modelfit_method.text == "Stokes I/DIFMAP":
+                flux=np.sum(self.current_modelfit_residual_plot.clean_image.residual_map[mask])
+            else:
+                flux = np.sum(self.current_modelfit_residual_plot.clean_image.Z[mask])
+            lin_pol=np.sum(self.current_modelfit_residual_plot.clean_image.lin_pol[mask])
+
+            stokes_q = np.sum(self.current_modelfit_residual_plot.clean_image.stokes_q[mask])
+            stokes_u = np.sum(self.current_modelfit_residual_plot.clean_image.stokes_u[mask])
+            evpa=1/2*np.arctan2(stokes_u,stokes_q)
+            
+
+            bmaj=self.modelfit_plots[i1].clean_image.beam_maj
+            bmin=self.modelfit_plots[i1].clean_image.beam_min
+            pxincr=self.current_modelfit_residual_plot.clean_image.degpp*self.current_modelfit_residual_plot.clean_image.scale
+
+            print(flux,bmaj,bmin,pxincr)
+            self.ids.component_flux.text = f"{JyPerBeam2Jy(flux,bmaj,bmin,pxincr)*1e3:.2f}"
+            self.ids.component_lin_pol.text = f"{JyPerBeam2Jy(lin_pol,bmaj,bmin,pxincr) * 1e3:.2f}"
+            self.ids.component_evpa.text = f"{evpa/np.pi*180:.2f}"
+
+
+            self.new_modelfit_component_coords=[]
+
+
+
+
+
+    #### END OF MODELFIT FUNCTIONS
+
     #### START OF STACKING FUNCTIONS
 
     def load_stacking_files(self):
@@ -1622,8 +2023,8 @@ class ModelFits(TabbedPanel):
                                                         contour_width = float(self.ids.contour_width.text),
                                                         im_color = self.ids.im_color.text,
                                                         plot_beam = self.ids.plot_beam.active,
-                                                        overplot_gauss = self.ids.overplot_gauss.active,
-                                                        overplot_clean = self.ids.overplot_clean.active,
+                                                        plot_model = self.ids.overplot_gauss.active,
+                                                        plot_clean = self.ids.overplot_clean.active,
                                                         component_color = self.ids.component_color.text,
                                                         xlim = xlim,
                                                         ylim = ylim,
@@ -1729,7 +2130,10 @@ class VCAT(App):
 
     #### END OF KINEMATIC FUNCTIONS
 
-    #### START OF STACKING FUNCTIONS
+    #### START OF MODELFIT FUNCTIONS
+
+    def plot_new_modelfit_component(self,xdata,ydata):
+        self.screen.plot_new_modelfit_component(xdata,ydata)
 
 if __name__ == "__main__":
     VCAT().run()
