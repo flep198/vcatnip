@@ -1274,12 +1274,12 @@ class ModelFits(TabbedPanel):
                 plot_comp_ids = False
             if len(self.stokes_u_filepaths) > ind and len(self.stokes_q_filepaths) > ind:
                 plot_data = ImageData(file, model=model, uvf_file=uvf_file, stokes_u=self.stokes_u_filepaths[ind],
-                                      stokes_q=self.stokes_q_filepaths[ind], noise_method=self.noise_method)
+                                      stokes_q=self.stokes_q_filepaths[ind], noise_method=self.noise_method,fit_comp_polarization=True)
                 image = FitsImage(plot_data, plot_mode="lin_pol", plot_model=plot_model, plot_comp_ids=plot_comp_ids,
                                   plot_evpa=True, evpa_color="black", contour_color="grey")
 
             else:
-                plot_data = ImageData(file, model=model, uvf_file=uvf_file, noise_method=self.noise_method)
+                plot_data = ImageData(file, model=model, uvf_file=uvf_file, noise_method=self.noise_method,fit_comp_polarization=True)
                 image = FitsImage(plot_data, plot_mode="lin_pol", plot_model=plot_model, plot_comp_ids=plot_comp_ids,
                                   plot_evpa=True, evpa_color="black", contour_color="grey")
 
@@ -1410,7 +1410,6 @@ class ModelFits(TabbedPanel):
         self.ids.modelfit_image.figure = modelfit_image.fig
         self.current_modelfit_residual_plot = res_plot
 
-        #TODO also update plot on the right!
 
     def change_modelfit_component_select(self,button=""):
         for i1, but in enumerate(self.ids.modelfit_list.children):
@@ -1512,9 +1511,12 @@ class ModelFits(TabbedPanel):
             self.show_popup("Error", "Please add components first!", "Continue")
 
         if self.ids.modelfit_method.text=="Stokes I/DIFMAP":
+            write_mod_file_from_components(self.modelfit_plots[ind].clean_image.components, "i", export="/tmp/mod.mod", adv=True)
             self.modelfit_plots[ind].clean_image.components=modelfit_difmap(self.modelfit_plots[ind].clean_image.uvf_file,
-                                                                            comps,int(self.ids.modelfit_count.text),
-                                                                            difmap_path=self.ids.difmap_path.text)
+                                                                            "/tmp/mod.mod",int(self.ids.modelfit_count.text),
+                                                                            difmap_path=self.ids.difmap_path.text,
+                                                                            components=self.modelfit_plots[ind].clean_image.components)
+            self.modelfit_plots[ind].clean_image.fit_comp_polarization()
         elif self.ids.modelfit_method.text=="Lin. Pol./ehtim":
             self.modelfit_plots[ind].clean_image.components=modelfit_ehtim(self.modelfit_plots[ind].clean_image.uvf_file,
                                                                            comps,int(self.ids.modelfit_count.text),
@@ -1619,19 +1621,22 @@ class ModelFits(TabbedPanel):
                 flux = np.sum(self.current_modelfit_residual_plot.clean_image.Z[mask])
             lin_pol=np.sum(self.current_modelfit_residual_plot.clean_image.lin_pol[mask])
 
-            stokes_q = np.sum(self.current_modelfit_residual_plot.clean_image.stokes_q[mask])
-            stokes_u = np.sum(self.current_modelfit_residual_plot.clean_image.stokes_u[mask])
-            evpa=1/2*np.arctan2(stokes_u,stokes_q)
-            
+            try:
+                stokes_q = np.sum(self.current_modelfit_residual_plot.clean_image.stokes_q[mask])
+                stokes_u = np.sum(self.current_modelfit_residual_plot.clean_image.stokes_u[mask])
+                evpa=1/2*np.arctan2(stokes_u,stokes_q)
+            except:
+                evpa = 0
 
-            bmaj=self.modelfit_plots[i1].clean_image.beam_maj
-            bmin=self.modelfit_plots[i1].clean_image.beam_min
-            pxincr=self.current_modelfit_residual_plot.clean_image.degpp*self.current_modelfit_residual_plot.clean_image.scale
 
-            print(flux,bmaj,bmin,pxincr)
-            self.ids.component_flux.text = f"{JyPerBeam2Jy(flux,bmaj,bmin,pxincr)*1e3:.2f}"
-            self.ids.component_lin_pol.text = f"{JyPerBeam2Jy(lin_pol,bmaj,bmin,pxincr) * 1e3:.2f}"
-            self.ids.component_evpa.text = f"{evpa/np.pi*180:.2f}"
+                bmaj=self.modelfit_plots[i1].clean_image.beam_maj
+                bmin=self.modelfit_plots[i1].clean_image.beam_min
+                pxincr=self.current_modelfit_residual_plot.clean_image.degpp*self.current_modelfit_residual_plot.clean_image.scale
+
+                print(flux,bmaj,bmin,pxincr)
+                self.ids.component_flux.text = f"{JyPerBeam2Jy(flux,bmaj,bmin,pxincr)*1e3:.2f}"
+                self.ids.component_lin_pol.text = f"{JyPerBeam2Jy(lin_pol,bmaj,bmin,pxincr) * 1e3:.2f}"
+                self.ids.component_evpa.text = f"{evpa/np.pi*180:.2f}"
 
 
             self.new_modelfit_component_coords=[]

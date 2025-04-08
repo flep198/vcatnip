@@ -21,6 +21,8 @@ def upload_csv_to_MOJAVE(csv_file,observer,password,source):
 
     cursor = mydb.cursor()
 
+    updated_epochs=[]
+
     for index, row in df.iterrows():
         freq=float(row["freq"])/1e9
         if 15<freq and freq<16:
@@ -52,16 +54,25 @@ def upload_csv_to_MOJAVE(csv_file,observer,password,source):
                 return get_mojave_date(date, source, iter=iter)
             else:
                 return date
+
         row["date"]=get_mojave_date(row["date"],source)
 
+        if row["date"] not in updated_epochs:
+            #remove previous modelfit version
+            updated_epochs.append(row["date"])
+            delete_query = ("DELETE FROM " + database + " WHERE source='" + source + "' AND observer='" + observer +
+                        "' AND method='UV' AND stokes='I' AND epoch='" + row['date'] +"'")
+            cursor.execute(delete_query)
+
+        """
         #check if a modelfit already exists:
         select_query = ("SELECT COUNT(*) FROM " + database + " WHERE source='" + source + "' AND observer='" + observer +
                         "' AND method='UV' AND stokes='I' AND epoch='" + row['date'] +"' AND id='" + str(row["component_number"]) + "'" )
 
         cursor.execute(select_query)
         result = cursor.fetchone()
-
-        if result[0] == 0:
+        """
+        if True:#result[0] == 0:
             # No matching row found, so insert new record
             insert_query = ("INSERT INTO " + database +
             " (source, epoch, id, flux, dist, pa, size, ratio, cpa, stokes,observer,method,freq, use_in_fit, counterjet, rating) VALUES " +
