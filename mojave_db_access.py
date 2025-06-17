@@ -104,7 +104,7 @@ def upload_csv_to_MOJAVE(csv_file,observer,password,source):
         # Commit the transaction
         mydb.commit()
 
-def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path,foldername="tmp_data"):
+def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path,foldername="tmp_data",delete_folder=True,local_files=False):
 
     # connect to database:
     mydb = sql.connect(
@@ -131,7 +131,8 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path,fol
     epochs=np.unique(component_table["epoch"])
 
     #create folder
-    os.system("rm -rf "+foldername)
+    if delete_folder:
+        os.system("rm -rf "+foldername)
     os.makedirs(foldername,exist_ok=True)
 
     #extract data epoch by epoch
@@ -176,7 +177,8 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path,fol
                 print(f"Failed to download file. Status code: {response.status_code}")
                 return filename
 
-        filename=download_file(url,local_filename,filename,epoch)
+        if not local_files:
+            filename=download_file(url,local_filename,filename,epoch)
         try:
             epoch_new=get_date(foldername+"/"+filename+".uvf")
             epochs[index]=epoch_new
@@ -190,6 +192,16 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path,fol
         with open(foldername + "/modfile.mod", 'w') as file:
 
             for ind, row in component_table[component_table["epoch"] == epoch].iterrows():
+                try:
+                    freq=float(row["freq"] * 1e9)
+                except:
+                    if band=="Ku":
+                        freq=15000000000.0
+                    elif band=="K":
+                        freq=23583875000.0
+                    elif band=="Q":
+                        freq=43000000000.0
+
                 print("{:.6f}".format(float(row["flux"])),
                       "{:.6f}".format(float(row["dist"])),
                       "{:.3f}".format(float(row["pa"])),
@@ -197,19 +209,20 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path,fol
                       "{:.5f}".format(float(row["ratio"])),
                       "{:.3f}".format(float(row["cpa"])),
                       "1",
-                      "{:.5e}".format(float(row["freq"] * 1e9)),
+                      "{:.5e}".format(freq),
                       "0",
                       file=file)
 
         os.chdir(foldername)
         #Initialize DIFMAP to create modelfit.fits file
-        child = pexpect.spawn(difmap_path+"/difmap", encoding='utf-8', echo=False, cwd=foldername)
+        child = pexpect.spawn(difmap_path+"/difmap", encoding='utf-8', echo=True, cwd=foldername)
         child.expect_exact("0>", None, 2)
 
         def send_difmap_command(command, prompt="0>"):
             child.sendline(command)
             child.expect_exact(prompt, None, 2)
 
+        print(filename)
         send_difmap_command("obs " + filename+".uvf")
         send_difmap_command("select i")
         send_difmap_command("rmod modfile.mod")
@@ -261,6 +274,10 @@ def download_kinematic_from_MOJAVE(source,band,observer,password,difmap_path,fol
     df_merged["x"] = df_merged["Delta_x"]
     df_merged["y"] = df_merged["Delta_y"]
     df_merged['redshift'] = 0
+    try:
+        df_merged["freq"]
+    except:
+        df_merged["freq"]=freq
 
     # Create the "is_core" column
     df_merged['is_core'] = df_merged['component_number'] == 0

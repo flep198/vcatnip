@@ -17,7 +17,7 @@ import os
 import pandas as pd
 import glob
 from matplotlib.patches import Ellipse
-from vcat.stacking_helpers import stack_fits, stack_pol_fits, fold_with_beam, modelfit_ehtim, modelfit_difmap
+from vcat.stacking_helpers import stack_fits, stack_pol_fits, fold_with_beam, modelfit_ehtim_pol, modelfit_difmap
 from vcat.kinematics import ComponentCollection, Component
 from vcat import FitsImage, ImageData, KinematicPlot, ImageCube
 from vcat.helpers import get_date, get_common_beam, write_mod_file_from_components, get_residual_map, Jy2JyPerBeam, JyPerBeam2Jy
@@ -128,14 +128,19 @@ class ModelFits(TabbedPanel):
 
     def sort_fits_by_date(self,fits_files):
         fits_files = np.array(fits_files)
-        if len(fits_files)>0:
-            date=[]
 
-            for filepath in fits_files:
-                date=np.append(date,get_date(filepath))
+        try:
+            if len(fits_files)>0:
+                date=[]
 
-            args = date.argsort()
-            fits_files = fits_files[args]
+                for filepath in fits_files:
+                    date=np.append(date,get_date(filepath))
+
+                args = date.argsort()
+                fits_files = fits_files[args]
+        except:
+            pass
+
         return fits_files.tolist()
 
     def sort_uvf_by_date(self,uvf_files):
@@ -172,7 +177,10 @@ class ModelFits(TabbedPanel):
         combined = selection + self.modelfit_filepaths
 
         # sort by date
-        self.modelfit_filepaths = self.sort_fits_by_date(combined)
+        try:
+            self.modelfit_filepaths = self.sort_fits_by_date(combined)
+        except:
+            pass
         try:
             self.the_popup.dismiss()
         except:
@@ -353,11 +361,11 @@ class ModelFits(TabbedPanel):
             #create plots for view page
             for ind,filepath in enumerate(modelfit_files_to_plot):
                 if not len(uvf_files_to_plot) == len(modelfit_files_to_plot):
-                    plot_data=ImageData(clean_files_to_plot[ind],model=filepath,noise_method=self.noise_method)
+                    plot_data=ImageData(clean_files_to_plot[ind],model=filepath,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                     warn_uvf=True
                 else:
                     plot_data = ImageData(clean_files_to_plot[ind], model=filepath, uvf_file=uvf_files_to_plot[ind],
-                                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
+                                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 plot=FitsImage(plot_data,plot_model=True)
                 fits_images=np.append(fits_images,plot)
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
@@ -365,17 +373,18 @@ class ModelFits(TabbedPanel):
                 self.show_popup("Warning",
                                 "No .uvf files loaded, will not be able to calculate good upper limits for TB!",
                                 "Continue")
+
         #otherwise check if no clean maps were provided and only modelfit maps
         elif len(clean_files_to_plot) == 0 and len(modelfit_files_to_plot)>0:
             # create plots for view page
             warn_uvf=False
             for ind,filepath in enumerate(modelfit_files_to_plot):
                 if not len(uvf_files_to_plot) == len(modelfit_files_to_plot):
-                    plot_data = ImageData(filepath,model=filepath,noise_method=self.noise_method)
+                    plot_data = ImageData(filepath,model=filepath,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                     warn_uvf=True
                 else:
                     plot_data = ImageData(filepath, model=filepath, uvf_file=uvf_files_to_plot[ind],
-                                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
+                                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 plot = FitsImage(plot_data,plot_model=True)
                 fits_images = np.append(fits_images, plot)
             self.show_popup("Warning",
@@ -447,18 +456,18 @@ class ModelFits(TabbedPanel):
             #create new ImageData object
             try:
                 plot_data=ImageData(self.clean_filepaths[ind], model=self.modelfit_filepaths[ind], uvf_file=self.uvf_filepaths[ind],
-                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
+                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
             except:
                 try:
                     plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],
-                                        uvf_file=self.uvf_filepaths[ind],noise_method=self.noise_method)
+                                        uvf_file=self.uvf_filepaths[ind],noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 except:
                     try:
                         plot_data=ImageData(self.clean_filepaths[ind],model=self.modelfit_filepaths[ind],
-                                            noise_method=self.noise_method)
+                                            noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                     except:
                         plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],
-                                            noise_method=self.noise_method)
+                                            noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
 
             plot = FitsImage(plot_data, plot_model=True)
             #create Figure
@@ -869,7 +878,7 @@ class ModelFits(TabbedPanel):
                 comp_collection=ComponentCollection(collection,name=self.components[i])
                 self.component_collections.append(comp_collection)
 
-                if active_button != None and active_button.text == "Flux Density":
+                if active_button != None and active_button.text == "Flux":
                     self.kplot.plot_fluxs(comp_collection,self.current_color(i))
                     self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
                                           [0, 1.2 * flux_max])
@@ -881,8 +890,10 @@ class ModelFits(TabbedPanel):
                     self.kplot.plot_kinematics(comp_collection,self.current_color(i))
                     self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
                                           [0, 1.2 * d_max])
-
-
+                elif active_button != None and active_button.text == "PA":
+                    self.kplot.plot_pas(comp_collection, self.current_color(i))
+                    self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
+                                          [0, 1.2 * d_max])
 
                 if (active_button != None) and (len(collection)>2) and (active_button.text == "Kinematic"):
                     fit_data = comp_collection.get_speed()[0]
@@ -1274,12 +1285,12 @@ class ModelFits(TabbedPanel):
                 plot_comp_ids = False
             if len(self.stokes_u_filepaths) > ind and len(self.stokes_q_filepaths) > ind:
                 plot_data = ImageData(file, model=model, uvf_file=uvf_file, stokes_u=self.stokes_u_filepaths[ind],
-                                      stokes_q=self.stokes_q_filepaths[ind], noise_method=self.noise_method,fit_comp_polarization=True)
+                                      stokes_q=self.stokes_q_filepaths[ind], noise_method=self.noise_method,fit_comp_polarization=True,is_ehtim_model=self.ids.is_ehtim_model.active)
                 image = FitsImage(plot_data, plot_mode="lin_pol", plot_model=plot_model, plot_comp_ids=plot_comp_ids,
                                   plot_evpa=True, evpa_color="black", contour_color="grey")
 
             else:
-                plot_data = ImageData(file, model=model, uvf_file=uvf_file, noise_method=self.noise_method,fit_comp_polarization=True)
+                plot_data = ImageData(file, model=model, uvf_file=uvf_file, noise_method=self.noise_method,fit_comp_polarization=True,is_ehtim_model=self.ids.is_ehtim_model.active)
                 image = FitsImage(plot_data, plot_mode="lin_pol", plot_model=plot_model, plot_comp_ids=plot_comp_ids,
                                   plot_evpa=True, evpa_color="black", contour_color="grey")
 
@@ -1518,10 +1529,19 @@ class ModelFits(TabbedPanel):
                                                                             components=self.modelfit_plots[ind].clean_image.components)
             self.modelfit_plots[ind].clean_image.fit_comp_polarization()
         elif self.ids.modelfit_method.text=="Lin. Pol./ehtim":
-            self.modelfit_plots[ind].clean_image.components=modelfit_ehtim(self.modelfit_plots[ind].clean_image.uvf_file,
+            if self.ids.modelfit_minimizer=="Dynesty Dynamic":
+                minimizer="dynesty_dynamic"
+            else:
+                minimizer="scipy.optimize.minimize"
+            self.modelfit_plots[ind].clean_image.components=modelfit_ehtim_pol(self.modelfit_plots[ind].clean_image.uvf_file,
                                                                            comps,int(self.ids.modelfit_count.text),
                                                                            npix=self.ids.modelfit_npix.text,
-                                                                           fov=self.ids.modelfit_fov.text)
+                                                                           fov=self.ids.modelfit_fov.text,
+                                                                            minimizer=minimizer,
+                                                                           nwalker=int(self.ids.nwalker_count.text),
+                                                                            max_size=float(self.ids.max_model_size.text),
+                                                                            max_flux=float(self.ids.max_model_flux.text),
+                                                                            max_dist=float(self.ids.max_model_dist.text))
 
         self.change_modelfit_plot(final_but)
 
@@ -1641,10 +1661,6 @@ class ModelFits(TabbedPanel):
 
             self.new_modelfit_component_coords=[]
 
-
-
-
-
     #### END OF MODELFIT FUNCTIONS
 
     #### START OF STACKING FUNCTIONS
@@ -1661,7 +1677,9 @@ class ModelFits(TabbedPanel):
                     model=self.modelfit_filepaths[ind]
                 else:
                     model=""
-                plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind],noise_method=self.noise_method)
+                plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],
+                                    stokes_q=self.stokes_q_filepaths[ind],noise_method=self.noise_method,
+                                    is_ehtim_model=self.ids.is_ehtim_model.active)
                 image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
             else:
                 #try to load model from clean .fits file
@@ -1669,7 +1687,7 @@ class ModelFits(TabbedPanel):
                     model=self.modelfit_filepaths[ind]
                 else:
                     model=""
-                plot_data=ImageData(file,model=model,noise_method=self.noise_method)
+                plot_data=ImageData(file,model=model,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
 
             #check if polarization information was given:
@@ -1771,16 +1789,16 @@ class ModelFits(TabbedPanel):
 
             for i in range(len(files_to_stack)):
                 if models_loaded:
-                    image=ImageData(files_to_stack[i],model=files_to_stack_models[i],noise_method=self.noise_method)
+                    image=ImageData(files_to_stack[i],model=files_to_stack_models[i],noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 else:
-                    image=ImageData(files_to_stack[i],noise_method=self.noise_method)
+                    image=ImageData(files_to_stack[i],noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 mod_file_paths.append("tmp/mod_files_clean/"+image.date+ "_" + "{:.0f}".format(image.freq/1e9).replace(".","_") + "GHz.mod")
 
             if fold_polarization_beams:
                 try:
                     #DIFMAP style
                     for file in files_to_stack_q:
-                        image_q=ImageData(file,model_save_dir="tmp/mod_files_q/",noise_method=self.noise_method)
+                        image_q=ImageData(file,model_save_dir="tmp/mod_files_q/",noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                         mod_file_paths_q.append("tmp/mod_files_q/" + image_q.date + "_" +"{:.0f}".format(image_q.freq/1e9).replace(".","_") + "GHz.mod")
                     if len(files_to_stack_q)==0:
                         raise Exception()
@@ -1788,7 +1806,7 @@ class ModelFits(TabbedPanel):
                     # TRY to import CASA clean model
                     try:
                         for file in files_to_stack_casa_clean_models:
-                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method)
+                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                             mod_file_paths_q.append("tmp/mod_files_q/"+image_model.date+ "_" + "{:.0f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
                             files_to_stack_q.append(file)
                     except:
@@ -1798,7 +1816,7 @@ class ModelFits(TabbedPanel):
                 try:
                     #DIFMAP style
                     for file in files_to_stack_u:
-                        image_u=ImageData(file,model_save_dir="tmp/mod_files_u/",noise_method=self.noise_method)
+                        image_u=ImageData(file,model_save_dir="tmp/mod_files_u/",noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                         mod_file_paths_u.append("tmp/mod_files_u/"+image_u.date+ "_" + "{:.0f}".format(image_u.freq/1e9).replace(".","_") + "GHz.mod")
                     if len(files_to_stack_u)==0:
                         raise Exception()
@@ -1806,7 +1824,7 @@ class ModelFits(TabbedPanel):
                     try:
                         # TRY to import CASA clean model
                         for file in files_to_stack_casa_clean_models:
-                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method)
+                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                             mod_file_paths_u.append("tmp/mod_files_u/"+image_model.date+ "_" +"{:.0f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
                             files_to_stack_u.append(file)
                     except:
@@ -1863,12 +1881,12 @@ class ModelFits(TabbedPanel):
         if self.ids.stack_stokes_check.active:
             output_stacked = stack_fits(files_to_stack,align=align,stokes_q_fits=files_to_stack_q,stokes_u_fits=files_to_stack_u)
             if len(output_stacked) == 1:
-                stack_image = ImageData(files_to_stack[0],pol_from_stokes=True,noise_method=self.noise_method)
+                stack_image = ImageData(files_to_stack[0],pol_from_stokes=True,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 stack_image.Z = output_stacked[0][0]
             elif len(output_stacked) > 1: #check for polarization
                 stack_image = ImageData(files_to_stack[0], stokes_i=output_stacked[0][0],
                                         pol_from_stokes=True,stokes_q=output_stacked[1][0],stokes_u=output_stacked[2][0],
-                                        noise_method=self.noise_method)
+                                        noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 stack_image.Z = output_stacked[0][0]
                 stack_image.stokes_q = output_stacked[1][0]
                 stack_image.stokes_u = output_stacked[2][0]
@@ -1878,7 +1896,7 @@ class ModelFits(TabbedPanel):
         elif self.ids.stack_pol_check.active:
             output_stacked=stack_pol_fits(files_to_stack,weighted=weighted,align=align,stokes_u_fits=files_to_stack_u,stokes_q_fits=files_to_stack_q)
             #create new image data with header info from first fits file
-            stack_image = ImageData(files_to_stack[0],pol_from_stokes=False,noise_method=self.noise_method)
+            stack_image = ImageData(files_to_stack[0],pol_from_stokes=False,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
             stack_image.Z = output_stacked[0][0]
             if len(output_stacked) > 1:  # check for polarization
                 stack_image.lin_pol = output_stacked[1][0]
@@ -1943,10 +1961,10 @@ class ModelFits(TabbedPanel):
                 stokes_q_path = ""
 
             try:# import CASA STYLE models
-                ImageData(self.casa_clean_model_filepaths[ind],model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method)
+                ImageData(self.casa_clean_model_filepaths[ind],model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
             except:
                 pass
-            plot_data=ImageData(clean_path,model=model_path,stokes_q=stokes_q_path,stokes_u=stokes_u_path,noise_method=self.noise_method)
+            plot_data=ImageData(clean_path,model=model_path,stokes_q=stokes_q_path,stokes_u=stokes_u_path,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
             self.plotting_single_plots_data.append(plot_data)
             plot=FitsImage(plot_data)
             self.plotting_single_plots.append(plot)

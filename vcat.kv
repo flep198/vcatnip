@@ -724,6 +724,15 @@
             Label:
                 text: ''
                 size_hint_x: 0.2
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: "Model is from ehtim?"
+                size_hint_x: 0.2
+            CheckBox:
+                id: is_ehtim_model
+                size_hint_x: 0.4
     TabbedPanelItem:
         text: 'ModelComps'
         background_color: (1, .5, 0, 1)
@@ -920,7 +929,7 @@
                                         self.state='down'
                                 ToggleButton:
                                     group:'kinematic_select'
-                                    text:"Flux Density"
+                                    text:"Flux"
                                     id: flux_choose
                                     on_release:
                                         app.update_kinematic_plot()
@@ -939,6 +948,13 @@
                                     on_release:
                                         app.update_kinematic_plot()
                                         self.state='down'
+                                ToggleButton:
+                                    group:'kinematic_select'
+                                    text:"PA"
+                                    id: posa_choose
+                                    on_release:
+                                        app.update_kinematic_plot()
+                                        self.state="down"
                         ToggleButton:
                             group:'kinematic_select'
                             size_hint_x: 0.25
@@ -1146,11 +1162,32 @@
                             size_hint_y: 1
                             on_release:
                                 root.do_modelfit()
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Label:
+                            text: "Minimizer"
+                        Spinner:
+                            text: 'Dynesty Dynamic'
+                            id: modelfit_minimizer
+                            values: ['Dynesty Dynamic', 'scipy.minimize']
+                            size_hint_y: 1
+                            size_hint_x: 0.7
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Label:
+                            text: "nwalker"
+                        TextInput:
+                            text: "200"
+                            id: nwalker_count
+                        Label:
+                            text: "niter"
                         TextInput:
                             text: "20"
                             id: modelfit_count
-                            size_hint_x: 0.3
-                            size_hint_y: 1
                     BoxLayout:
                         size_hint_y: 0.05
                         size_hint_x: 1
@@ -1158,13 +1195,36 @@
                         Label:
                             text: "FOV [mas]"
                         TextInput:
-                            text: ""
+                            text: "10"
                             id: modelfit_fov
                         Label:
                             text: "npix"
                         TextInput:
-                            text: ""
+                            text: "1024"
                             id: modelfit_npix
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Label:
+                            text: "Max. Flux [Jy]"
+                        TextInput:
+                            text: "1"
+                            id: max_model_flux
+                        Label:
+                            text: "Max. Size [mas]"
+                        TextInput:
+                            text: "5"
+                            id: max_model_size
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Label:
+                            text: "Max. Dist [mas]"
+                        TextInput:
+                            text: "5"
+                            id: max_model_dist
                     BoxLayout:
                         size_hint_y: 0.40
                 BoxLayout
