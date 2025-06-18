@@ -1529,7 +1529,7 @@ class ModelFits(TabbedPanel):
                                                                             components=self.modelfit_plots[ind].clean_image.components)
             self.modelfit_plots[ind].clean_image.fit_comp_polarization()
         elif self.ids.modelfit_method.text=="Lin. Pol./ehtim":
-            if self.ids.modelfit_minimizer=="Dynesty Dynamic":
+            if self.ids.modelfit_minimizer.text=="Dynesty Dynamic":
                 minimizer="dynesty_dynamic"
             else:
                 minimizer="scipy.optimize.minimize"
@@ -1541,7 +1541,8 @@ class ModelFits(TabbedPanel):
                                                                            nwalker=int(self.ids.nwalker_count.text),
                                                                             max_size=float(self.ids.max_model_size.text),
                                                                             max_flux=float(self.ids.max_model_flux.text),
-                                                                            max_dist=float(self.ids.max_model_dist.text))
+                                                                            max_dist=float(self.ids.max_model_dist.text),
+                                                                            circ_gauss=self.ids.fit_circ.active)
 
         self.change_modelfit_plot(final_but)
 
@@ -1648,15 +1649,14 @@ class ModelFits(TabbedPanel):
             except:
                 evpa = 0
 
+            bmaj=self.modelfit_plots[i1].clean_image.beam_maj
+            bmin=self.modelfit_plots[i1].clean_image.beam_min
+            pxincr=self.current_modelfit_residual_plot.clean_image.degpp*self.current_modelfit_residual_plot.clean_image.scale
 
-                bmaj=self.modelfit_plots[i1].clean_image.beam_maj
-                bmin=self.modelfit_plots[i1].clean_image.beam_min
-                pxincr=self.current_modelfit_residual_plot.clean_image.degpp*self.current_modelfit_residual_plot.clean_image.scale
 
-                print(flux,bmaj,bmin,pxincr)
-                self.ids.component_flux.text = f"{JyPerBeam2Jy(flux,bmaj,bmin,pxincr)*1e3:.2f}"
-                self.ids.component_lin_pol.text = f"{JyPerBeam2Jy(lin_pol,bmaj,bmin,pxincr) * 1e3:.2f}"
-                self.ids.component_evpa.text = f"{evpa/np.pi*180:.2f}"
+            self.ids.component_flux.text = f"{JyPerBeam2Jy(flux,bmaj,bmin,pxincr)*1e3:.2f}"
+            self.ids.component_lin_pol.text = f"{JyPerBeam2Jy(lin_pol,bmaj,bmin,pxincr) * 1e3:.2f}"
+            self.ids.component_evpa.text = f"{evpa/np.pi*180:.2f}"
 
 
             self.new_modelfit_component_coords=[]

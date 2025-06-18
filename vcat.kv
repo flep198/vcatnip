@@ -1019,9 +1019,9 @@
                         size_hint_x: 1
                         size_hint_y: 0.05
                     Spinner:
-                        text: 'Stokes I/DIFMAP'
+                        text: 'Lin. Pol./ehtim'
                         id: modelfit_method
-                        values: ['Stokes I/DIFMAP', 'Lin. Pol./ehtim']
+                        values: ['Lin. Pol./ehtim','Stokes I/DIFMAP']
                         size_hint_y: 0.05
                         size_hint_x: 1
                         on_text:
@@ -1225,6 +1225,10 @@
                         TextInput:
                             text: "5"
                             id: max_model_dist
+                        Label:
+                            text: "Fit Circ?"
+                        CheckBox:
+                            id: fit_circ
                     BoxLayout:
                         size_hint_y: 0.40
                 BoxLayout
