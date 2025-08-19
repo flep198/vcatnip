@@ -17,7 +17,7 @@ import os
 import pandas as pd
 import glob
 from matplotlib.patches import Ellipse
-from vcat.stacking_helpers import stack_fits, stack_pol_fits, fold_with_beam, modelfit_ehtim_pol, modelfit_difmap
+from vcat.stacking_helpers import stack_fits, stack_pol_fits, fold_with_beam, modelfit_ehtim_pol, modelfit_ehtim_full_pol, modelfit_difmap
 from vcat.kinematics import ComponentCollection, Component
 from vcat import FitsImage, ImageData, KinematicPlot, ImageCube
 from vcat.helpers import get_date, get_common_beam, write_mod_file_from_components, get_residual_map, Jy2JyPerBeam, JyPerBeam2Jy
@@ -46,6 +46,13 @@ class ExportMoviePopup(Popup):
     def load_filepath_to_view(self, selection):
         if selection!=[]:
             self.ids.export_movie_save.text = str(selection[0])
+
+class ModelfitExportPopup(Popup):
+    load = ObjectProperty()
+
+    def load_filepath_to_view(self, selection):
+        if selection!=[]:
+            self.ids.export_modelfit_save.text = str(selection[0])
 
 class PlotExportPopup(Popup):
     load = ObjectProperty()
@@ -366,7 +373,7 @@ class ModelFits(TabbedPanel):
                 else:
                     plot_data = ImageData(clean_files_to_plot[ind], model=filepath, uvf_file=uvf_files_to_plot[ind],
                                           difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-                plot=FitsImage(plot_data,plot_model=True)
+                plot=FitsImage(plot_data,plot_model=True,adjust_comp_size_to_res_lim=True)
                 fits_images=np.append(fits_images,plot)
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
             if warn_uvf:
@@ -385,7 +392,7 @@ class ModelFits(TabbedPanel):
                 else:
                     plot_data = ImageData(filepath, model=filepath, uvf_file=uvf_files_to_plot[ind],
                                           difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-                plot = FitsImage(plot_data,plot_model=True)
+                plot = FitsImage(plot_data,plot_model=True,adjust_comp_size_to_res_lim=True)
                 fits_images = np.append(fits_images, plot)
             self.show_popup("Warning",
                             "No clean images imported, using only modelfit images.\n Have fun doing kinematics!",
@@ -469,7 +476,7 @@ class ModelFits(TabbedPanel):
                         plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],
                                             noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
 
-            plot = FitsImage(plot_data, plot_model=True)
+            plot = FitsImage(plot_data, plot_model=True, adjust_comp_size_to_res_lim=True)
             #create Figure
             new_figure = MatplotFigure(size_hint_x=None,
                                        width=100)
@@ -1373,7 +1380,7 @@ class ModelFits(TabbedPanel):
             write_mod_file_from_components(comps,"i","/tmp/tmp_data_vcat/i_model.mod")
 
             #calculate new residual plot
-            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file,"/tmp/tmp_data_vcat/i_model.mod",
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file,"/tmp/tmp_data_vcat/i_model.mod","/tmp/tmp_data_vcat/i_model.mod",
                              difmap_path=self.ids.difmap_path.text, save_location="/tmp/tmp_data_vcat/i_res.fits",
                              npix=len(self.modelfit_plots[ind].clean_image.X)*2,
                              pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
@@ -1395,15 +1402,51 @@ class ModelFits(TabbedPanel):
             write_mod_file_from_components(comps, "q", "/tmp/tmp_data_vcat/q_model.mod")
             write_mod_file_from_components(comps, "u", "/tmp/tmp_data_vcat/u_model.mod")
             #calculate residual maps
-            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/q_model.mod",difmap_path=self.ids.difmap_path.text,
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/q_model.mod","/tmp/tmp_data_vcat/q_model.mod",difmap_path=self.ids.difmap_path.text,
                              channel="q", save_location="/tmp/tmp_data_vcat/q_res.fits", npix=len(self.modelfit_plots[ind].clean_image.X)*2,
                              pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
-            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/u_model.mod",difmap_path=self.ids.difmap_path.text,
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/u_model.mod","/tmp/tmp_data_vcat/u_model.mod",difmap_path=self.ids.difmap_path.text,
                              channel="u", save_location="/tmp/tmp_data_vcat/u_res.fits", npix=len(self.modelfit_plots[ind].clean_image.X)*2,
                              pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
 
             #create residual image
             res_image = ImageData(self.modelfit_plots[ind].clean_image.fits_file,
+                                  stokes_q="/tmp/tmp_data_vcat/q_res.fits", stokes_u="/tmp/tmp_data_vcat/u_res.fits")
+
+            res_plot = res_image.plot(plot_mode="lin_pol", plot_evpa=True,title="Residual Map")
+            # get current modelfit plot (right)
+            modelfit_image = ImageData(self.modelfit_plots[ind].clean_image.fits_file,
+                                       stokes_q=self.modelfit_plots[ind].clean_image.stokes_q_path,
+                                       stokes_u=self.modelfit_plots[ind].clean_image.stokes_u_path).plot(plot_mode="lin_pol",plot_evpa=True)
+
+            for comp in comps:
+                res_plot.plotComponent(comp.x,comp.y,comp.maj,comp.min,comp.pos,comp.scale,fillcolor="",id=comp.component_number,evpa=comp.evpa)
+                modelfit_image.plotComponent(comp.x, comp.y, comp.maj, comp.min, comp.pos, comp.scale, fillcolor="",
+                                       id=comp.component_number, evpa=comp.evpa)
+
+        elif self.ids.modelfit_method.text=="Full Pol./ehtim":
+            #write .mod files
+            write_mod_file_from_components(comps, "i", "/tmp/tmp_data_vcat/i_model.mod")
+            write_mod_file_from_components(comps, "q", "/tmp/tmp_data_vcat/q_model.mod")
+            write_mod_file_from_components(comps, "u", "/tmp/tmp_data_vcat/u_model.mod")
+            #calculate residual maps
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/i_model.mod","/tmp/tmp_data_vcat/i_model.mod",
+                             difmap_path=self.ids.difmap_path.text,
+                             channel="i", save_location="/tmp/tmp_data_vcat/i_res.fits",
+                             npix=len(self.modelfit_plots[ind].clean_image.X) * 2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp * self.modelfit_plots[
+                                 ind].clean_image.scale)
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/q_model.mod", "/tmp/tmp_data_vcat/q_model.mod",
+                             difmap_path=self.ids.difmap_path.text,
+                             channel="q", save_location="/tmp/tmp_data_vcat/q_res.fits", npix=len(self.modelfit_plots[ind].clean_image.X)*2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/u_model.mod","/tmp/tmp_data_vcat/u_model.mod",
+                             difmap_path=self.ids.difmap_path.text,
+                             channel="u", save_location="/tmp/tmp_data_vcat/u_res.fits", npix=len(self.modelfit_plots[ind].clean_image.X)*2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
+
+            #create residual image
+            res_image = ImageData("/tmp/tmp_data_vcat/i_res.fits",
                                   stokes_q="/tmp/tmp_data_vcat/q_res.fits", stokes_u="/tmp/tmp_data_vcat/u_res.fits")
 
             res_plot = res_image.plot(plot_mode="lin_pol", plot_evpa=True,title="Residual Map")
@@ -1544,7 +1587,29 @@ class ModelFits(TabbedPanel):
                                                                             max_dist=float(self.ids.max_model_dist.text),
                                                                             circ_gauss=self.ids.fit_circ.active)
 
+        elif self.ids.modelfit_method.text=="Full Pol./ehtim":
+            if self.ids.modelfit_minimizer.text=="Dynesty Dynamic":
+                minimizer="dynesty_dynamic"
+            else:
+                minimizer="scipy.optimize.minimize"
+            self.modelfit_plots[ind].clean_image.components=modelfit_ehtim_full_pol(self.modelfit_plots[ind].clean_image.uvf_file,
+                                                                           comps,int(self.ids.modelfit_count.text),
+                                                                           npix=self.ids.modelfit_npix.text,
+                                                                           fov=self.ids.modelfit_fov.text,
+                                                                            minimizer=minimizer,
+                                                                           nwalker=int(self.ids.nwalker_count.text),
+                                                                            max_size=float(self.ids.max_model_size.text),
+                                                                            max_flux=float(self.ids.max_model_flux.text),
+                                                                            max_dist=float(self.ids.max_model_dist.text),
+                                                                            circ_gauss=self.ids.fit_circ.active)
+
+
         self.change_modelfit_plot(final_but)
+
+    def open_export_modelfit_popup(self,button=""):
+        if len(self.modelfit_plots) > 0:
+            self.export_modelfit_dialog = ModelfitExportPopup()
+            self.export_modelfit_dialog.open()
 
     def set_residual_touch_mode(self,button="",mode="zoom"):
         if mode=="zoom":
@@ -2079,11 +2144,56 @@ class ModelFits(TabbedPanel):
         active_plot = self.plotting_single_plots[ind]
         active_plot.export(export_name)
 
+    def export_modelfit(self,export_name):
+        active_button = next((t for t in ToggleButton.get_widgets('modelfit_plots') if t.state == 'down'), None)
+        ind = np.where(np.array(self.modelfit_plot_buttons) == active_button)[0][0]
+        active_plot = self.modelfit_plots[ind]
 
+        # get current components
+        comps = active_plot.clean_image.components
+        if len(comps) == 0:
+            self.show_popup("Error", "Please add components first!", "Continue")
 
-
-
-
+        if self.ids.modelfit_method.text == "Stokes I/DIFMAP":
+            write_mod_file_from_components(comps, "i", export=export_name,adv=False)
+        elif self.ids.modelfit_method.text == "Lin. Pol./ehtim":
+            if self.ids.modelfit_minimizer.text == "Dynesty Dynamic":
+                minimizer = "dynesty_dynamic"
+            else:
+                minimizer = "scipy.optimize.minimize"
+            #we run ehtim with niter=0 and an export name to export the current model
+            self.modelfit_plots[ind].clean_image.components = modelfit_ehtim_pol(
+                self.modelfit_plots[ind].clean_image.uvf_file,
+                comps, 0,
+                npix=self.ids.modelfit_npix.text,
+                fov=self.ids.modelfit_fov.text,
+                minimizer=minimizer,
+                nwalker=int(self.ids.nwalker_count.text),
+                max_size=float(self.ids.max_model_size.text),
+                max_flux=float(self.ids.max_model_flux.text),
+                max_dist=float(self.ids.max_model_dist.text),
+                circ_gauss=self.ids.fit_circ.active,
+                export_model=export_name,
+                skip_fit=True)
+        elif self.ids.modelfit_method.text == "Full Pol./ehtim":
+            if self.ids.modelfit_minimizer.text == "Dynesty Dynamic":
+                minimizer = "dynesty_dynamic"
+            else:
+                minimizer = "scipy.optimize.minimize"
+            #we run ehtim with niter=0 and an export name to export the current model
+            self.modelfit_plots[ind].clean_image.components = modelfit_ehtim_full_pol(
+                self.modelfit_plots[ind].clean_image.uvf_file,
+                comps, 0,
+                npix=self.ids.modelfit_npix.text,
+                fov=self.ids.modelfit_fov.text,
+                minimizer=minimizer,
+                nwalker=int(self.ids.nwalker_count.text),
+                max_size=float(self.ids.max_model_size.text),
+                max_flux=float(self.ids.max_model_flux.text),
+                max_dist=float(self.ids.max_model_dist.text),
+                circ_gauss=self.ids.fit_circ.active,
+                export_model=export_name,
+                skip_fit=True)
 
 class VCAT(App):
 
@@ -2141,6 +2251,9 @@ class VCAT(App):
 
     def export_plotting_plot(self,name,selection):
         self.screen.export_plotting_plot(name)
+
+    def export_modelfit(self,name,selection):
+        self.screen.export_modelfit(name)
 
     def export_data_to_mojave(self,observer,password,source):
         self.screen.export_data_to_mojave(observer,password,source)

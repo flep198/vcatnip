@@ -371,6 +371,43 @@
                 id: save_button
                 disabled: True if filechooser_save.selection==[] else False
 
+<ModelfitExportPopup>:
+    title: "Export Modelfit"
+    size_hint: .9, .9
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "vertical"
+        FileChooser:
+            id: filechooser_save
+            multiselect: False
+            dirselect: True
+            filters: ['']
+            FileChooserIconLayout:
+                on_touch_down: root.load_filepath_to_view(filechooser_save.selection)
+
+        BoxLayout:
+            size_hint: (1, 0.1)
+            pos_hint: {'center_x': .5, 'center_y': .5}
+            spacing: 20
+
+            TextInput:
+                id: export_modelfit_save
+                height: 30
+                multiline: False
+
+            Button:
+                text: "Cancel"
+                on_release: root.dismiss()
+            Button:
+                text: "Save"
+                on_release:
+                    app.export_modelfit(root.ids.export_modelfit_save.text,filechooser_save.selection)
+                    root.dismiss()
+                id: save_button
+                disabled: True if filechooser_save.selection==[] else False
+
+
 <PlotExportPopup>:
     title: "Export Plot"
     size_hint: .9, .9
@@ -1021,7 +1058,7 @@
                     Spinner:
                         text: 'Lin. Pol./ehtim'
                         id: modelfit_method
-                        values: ['Lin. Pol./ehtim','Stokes I/DIFMAP']
+                        values: ['Full Pol./ehtim','Lin. Pol./ehtim','Stokes I/DIFMAP']
                         size_hint_y: 0.05
                         size_hint_x: 1
                         on_text:
@@ -1134,7 +1171,7 @@
                         Button:
                             group: "residual_select"
                             id: add_component_button_residual
-                            text: "Add component"
+                            text: "Add comp"
                             on_release:
                                 root.set_residual_touch_mode(mode="add_component")
                                 self.state='down'
@@ -1148,6 +1185,12 @@
                                 root.set_residual_touch_mode(mode="zoom")
                                 self.state='down'
                                 add_component_button_residual.state="normal"
+                        Button:
+                            group: "residual_select"
+                            id: export_component_button
+                            text: "Export Comps"
+                            on_release:
+                                root.open_export_modelfit_popup()
 
                     MatplotFigure:
                         size_hint_y: 0.5
