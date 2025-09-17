@@ -60,6 +60,287 @@
                 id: save_button
                 disabled: True if filechooser_save.selection==[] else False
 
+<ExportMoviePopup>:
+    title: "Export Kinematic Movie"
+    size_hint: .9, .9
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "vertical"
+
+        BoxLayout:
+            orientation: "horizontal"
+
+            FileChooser:
+                size_hint: (0.7,1)
+                id: movie_filechooser_save
+                multiselect: False
+                dirselect: True
+                filters: ['']
+                FileChooserIconLayout:
+                    on_touch_down: root.load_filepath_to_view(movie_filechooser_save.selection)
+
+            BoxLayout:
+                orientation: "vertical"
+                size_hint: (0.3,1)
+                Label:
+                    text: "Plot Settings"
+                    size_hint_y:0.1
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Plot Mode"
+                        size_hint_x: 0.5
+                    Spinner:
+                        text: 'Stokes I'
+                        id: movie_plot_mode
+                        size_hint_x: 0.5
+                        values: ['Stokes I', 'Lin. Pol.', 'Frac. Pol.']
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Duration [s]"
+                    TextInput:
+                        id: movie_duration
+                        text: "10"
+                    Label:
+                        text: "FPS"
+                    TextInput:
+                        id: movie_fps
+                        text: "20"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Plot Gauss Modelfit?"
+                    CheckBox:
+                        id: movie_overplot_gauss
+                    Label:
+                        text: "Freq [GHz]"
+                    TextInput:
+                        id: movie_freq
+                        text: ""
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Colormap?"
+                    CheckBox:
+                        id: movie_im_colormap
+                    Label:
+                        text: "Colormap"
+                    TextInput:
+                        id: movie_im_color
+                        text: ''
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Contour?"
+                    CheckBox:
+                        id: movie_contour
+                        active: True
+                    Label:
+                        text: "Sigma Cut (Stokes I)"
+                    TextInput:
+                        id: movie_stokes_i_sigma_cut
+                        text: '3'
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Contour Color"
+                    TextInput:
+                        id: movie_contour_color
+                        text: "black"
+                    Label:
+                        text: "Contour Colormap"
+                    TextInput:
+                        id: movie_contour_cmap
+                        text: ''
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Contour Alpha"
+                    TextInput:
+                        id: movie_contour_alpha
+                        text: "1"
+                    Label:
+                        text: "Contour Width"
+                    TextInput:
+                        id: movie_contour_width
+                        text: '0.5'
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Component Color"
+                    TextInput:
+                        id: movie_component_color
+                        text: "black"
+                    Label:
+                        text: "rcParams"
+                    TextInput:
+                        id: movie_rcparams
+                        text: ''
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Bg Color"
+                    TextInput:
+                        id: movie_background_color
+                        text: "white"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Common beam?"
+                    CheckBox:
+                        id: movie_convolve
+                    Label:
+                        text: "Plot Beam?"
+                    CheckBox:
+                        id: movie_plot_beam
+                        active: True
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "RA min"
+                    TextInput:
+                        id: movie_ra_min
+                    Label:
+                        text: "RA max"
+                    TextInput:
+                        id: movie_ra_max
+                    Label:
+                        text: "DEC min"
+                    TextInput:
+                        id: movie_dec_min
+                    Label:
+                        text: "DEC max"
+                    TextInput:
+                        id: movie_dec_max
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Plot EVPA?"
+                    CheckBox:
+                        id: movie_plot_evpa
+                        active: False
+                    Label:
+                        text: "Rotate EVPA (deg)"
+                    TextInput:
+                        id: movie_rotate_evpa
+                        text: "0"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "EVPA len (pix)"
+                    TextInput:
+                        id: movie_evpa_len
+                        text: "8"
+                    Label:
+                        text: "EVPA dist (pix)"
+                    TextInput:
+                        id: movie_evpa_distance
+                        text: "10"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "EVPA color"
+                    TextInput:
+                        id: movie_evpa_color
+                        text: "white"
+                    Label:
+                        text: "EVPA Width"
+                    TextInput:
+                        id: movie_evpa_width
+                        text: "2"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+                BoxLayout:
+                    orientation: 'horizontal'
+                    size_hint_y: 0.1
+                    Label:
+                        text: "Lin Pol Sigma Cut"
+                    TextInput:
+                        id: movie_lin_pol_sigma_cut
+                        text: "3"
+                Label:
+                    text: ''
+                    size_hint_y: 0.1
+        BoxLayout:
+            size_hint: (1, 0.05)
+            pos_hint: {'center_x': .5, 'center_y': .5}
+            spacing: 20
+
+            TextInput:
+                id: export_movie_save
+                height: 30
+                multiline: False
+
+            Button:
+                text: "Cancel"
+                on_release: root.dismiss()
+            Button:
+                text: "Save"
+                on_release:
+                    app.save_movie(root,root.ids.export_movie_save.text,movie_filechooser_save.selection)
+                    root.dismiss()
+                id: movie_save_button
+                disabled: True if movie_filechooser_save.selection==[] else False
+
 <FileImportPopup>:
     title: "Import Kinematic Data"
     size_hint: .9, .9
@@ -89,6 +370,43 @@
                     root.dismiss()
                 id: save_button
                 disabled: True if filechooser_save.selection==[] else False
+
+<ModelfitExportPopup>:
+    title: "Export Modelfit"
+    size_hint: .9, .9
+    auto_dismiss: False
+
+    BoxLayout:
+        orientation: "vertical"
+        FileChooser:
+            id: filechooser_save
+            multiselect: False
+            dirselect: True
+            filters: ['']
+            FileChooserIconLayout:
+                on_touch_down: root.load_filepath_to_view(filechooser_save.selection)
+
+        BoxLayout:
+            size_hint: (1, 0.1)
+            pos_hint: {'center_x': .5, 'center_y': .5}
+            spacing: 20
+
+            TextInput:
+                id: export_modelfit_save
+                height: 30
+                multiline: False
+
+            Button:
+                text: "Cancel"
+                on_release: root.dismiss()
+            Button:
+                text: "Save"
+                on_release:
+                    app.export_modelfit(root.ids.export_modelfit_save.text,filechooser_save.selection)
+                    root.dismiss()
+                id: save_button
+                disabled: True if filechooser_save.selection==[] else False
+
 
 <PlotExportPopup>:
     title: "Export Plot"
@@ -443,8 +761,17 @@
             Label:
                 text: ''
                 size_hint_x: 0.2
+            Label:
+                text: ''
+                size_hint_x: 0.2
+            Label:
+                text: "Model is from ehtim?"
+                size_hint_x: 0.2
+            CheckBox:
+                id: is_ehtim_model
+                size_hint_x: 0.4
     TabbedPanelItem:
-        text: 'Kinematics'
+        text: 'ModelComps'
         background_color: (1, .5, 0, 1)
         background_normal: ''
         BoxLayout:
@@ -521,14 +848,19 @@
                             text:"Import Data"
                             on_release:
                                 root.open_import_dialog()
-                        TextInput:
+                        Button:
                             size_hint_x: 0.2
+                            text: "Export Movie"
+                            on_release:
+                                root.open_movie_dialog()
+                        TextInput:
+                            size_hint_x: 0.1
                             id: redshift
                             text: "0.00"
                             on_text: app.update_redshift()
                             multiline: False
                         Button:
-                            size_hint_x: 0.4
+                            size_hint_x: 0.3
                             text:"Get Redshift from NED"
                             on_release: app.get_redshift()
 
@@ -634,7 +966,7 @@
                                         self.state='down'
                                 ToggleButton:
                                     group:'kinematic_select'
-                                    text:"Flux Density"
+                                    text:"Flux"
                                     id: flux_choose
                                     on_release:
                                         app.update_kinematic_plot()
@@ -653,6 +985,13 @@
                                     on_release:
                                         app.update_kinematic_plot()
                                         self.state='down'
+                                ToggleButton:
+                                    group:'kinematic_select'
+                                    text:"PA"
+                                    id: posa_choose
+                                    on_release:
+                                        app.update_kinematic_plot()
+                                        self.state="down"
                         ToggleButton:
                             group:'kinematic_select'
                             size_hint_x: 0.25
@@ -674,7 +1013,277 @@
                     id: figures
                     spacing: 50
                     width: self.minimum_width
+    TabbedPanelItem:
+        text: 'ModelFit'
+        background_color: (1, .5, 0, 1)
+        background_normal: ''
+        BoxLayout:
+            id: modelfit_box
+            orientation: 'vertical'
+            Button:
+                text: 'Load Files'
+                size_hint_x: 0.2
+                size_hint_y: 0.05
+                on_release: root.load_modelfit_files()
+            BoxLayout:
+                orientation: 'horizontal'
+                padding: 50
+                BoxLayout:
+                    id: box_left_modelfit
+                    orientation: 'vertical'
+                    padding:20
+                    BoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: 0.1
+                        Label:
+                            text: "File List"
+                            size_hint_x: 1
+                    ScrollView:
+                        size: self.size
+                        size_hint_y: 0.9
+                        id: scroll_files
+                        GridLayout:
+                            size_hint_y: None
+                            cols: 1
+                            id: modelfit_list
+                            height: self.minimum_height
+                BoxLayout:
+                    id: box_center_left_modelfit
+                    orientation: "vertical"
+                    padding: 20
+                    Label:
+                        text: "Modelfit Method"
+                        size_hint_x: 1
+                        size_hint_y: 0.05
+                    Spinner:
+                        text: 'Lin. Pol./ehtim'
+                        id: modelfit_method
+                        values: ['Full Pol./ehtim','Lin. Pol./ehtim','Stokes I/DIFMAP']
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        on_text:
+                            root.change_modelfit_plot()
+                    BoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: 0.1
+                        Label:
+                            text: "Modelfit Components"
+                            size_hint_x: 1
+                    ScrollView:
+                        size: self.size
+                        size_hint_y: 0.3
+                        id: scroll_files
+                        GridLayout:
+                            size_hint_y: None
+                            cols: 1
+                            id: modelfit_component_list
+                            height: self.minimum_height
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: 0.05
+                        Button:
+                            text:"Add"
+                            on_release: root.add_modelfit_component()
+                        Button:
+                            text:"Remove"
+                            on_release: root.remove_modelfit_component()
+                        Button:
+                            text:"Load"
+                            on_release: root.load_modelfit_components()
+                        Button:
+                            text:"Update"
+                            on_release: root.update_modelfit_component()
+                    BoxLayout:
+                        size_hint_y: 0.5
+                        orientation: "vertical"
+                        padding: 10
+                        Label:
+                            text: "Component Properties"
+                            size_hint_y:0.1
+                        BoxLayout:
+                            orientation: "horizontal"
+                            size_hint_y: 0.25
+                            Label:
+                                text: "Flux [mJy]"
+                            TextInput:
+                                id: component_flux
+                                text: "1"
+                            Label:
+                                text: "PA [deg]"
+                            TextInput:
+                                id: component_pos
+                                text: "0"
+                        Label:
+                            text: ""
+                            size_hint_y: 0.05
+                        BoxLayout:
+                            orientation: "horizontal"
+                            size_hint_y: 0.25
+                            Label:
+                                text: "Maj [mas]"
+                            TextInput:
+                                id: component_maj
+                                text: "1"
+                            Label:
+                                text: "Min [mas]"
+                            TextInput:
+                                id: component_min
+                                text: "1"
+                        Label:
+                            text: ""
+                            size_hint_y: 0.05
+                        BoxLayout:
+                            orientation: "horizontal"
+                            size_hint_y: 0.25
+                            Label:
+                                text: "X [mas]"
+                            TextInput:
+                                id: component_x
+                                text: "0"
+                            Label:
+                                text: "Y [mas]"
+                            TextInput:
+                                id: component_y
+                                text: "0"
+                        Label:
+                            text: ""
+                            size_hint_y: 0.05
+                        BoxLayout:
+                            orientation: "horizontal"
+                            size_hint_y: 0.25
+                            Label:
+                                text: "Lin Pol [mJy]"
+                            TextInput:
+                                id: component_lin_pol
+                                text: "0"
+                            Label:
+                                text: "EVPA [deg]"
+                            TextInput:
+                                id: component_evpa
+                                text: "0"
+                BoxLayout:
+                    id: box_center_right_modelfit
+                    orientation: "vertical"
+                    padding: 20
+                    BoxLayout:
+                        orientation: "horizontal"
+                        size_hint_y: 0.05
+                        Button:
+                            group: "residual_select"
+                            id: add_component_button_residual
+                            text: "Add comp"
+                            on_release:
+                                root.set_residual_touch_mode(mode="add_component")
+                                self.state='down'
+                                zoom_mode_button_residual.state="normal"
+                        Button:
+                            text: "Zoom Mode"
+                            id: zoom_mode_button_residual
+                            group: "residual_select"
+                            state: "down"
+                            on_release:
+                                root.set_residual_touch_mode(mode="zoom")
+                                self.state='down'
+                                add_component_button_residual.state="normal"
+                        Button:
+                            group: "residual_select"
+                            id: export_component_button
+                            text: "Export Comps"
+                            on_release:
+                                root.open_export_modelfit_popup()
 
+                    MatplotFigure:
+                        size_hint_y: 0.5
+                        id: modelfit_residual_image
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Button:
+                            text: "modelfit"
+                            size_hint_x: 0.7
+                            size_hint_y: 1
+                            on_release:
+                                root.do_modelfit()
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Label:
+                            text: "Minimizer"
+                        Spinner:
+                            text: 'Dynesty Dynamic'
+                            id: modelfit_minimizer
+                            values: ['Dynesty Dynamic', 'scipy.minimize']
+                            size_hint_y: 1
+                            size_hint_x: 0.7
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Label:
+                            text: "nwalker"
+                        TextInput:
+                            text: "200"
+                            id: nwalker_count
+                        Label:
+                            text: "niter"
+                        TextInput:
+                            text: "20"
+                            id: modelfit_count
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Label:
+                            text: "FOV [mas]"
+                        TextInput:
+                            text: "10"
+                            id: modelfit_fov
+                        Label:
+                            text: "npix"
+                        TextInput:
+                            text: "1024"
+                            id: modelfit_npix
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Label:
+                            text: "Max. Flux [Jy]"
+                        TextInput:
+                            text: "1"
+                            id: max_model_flux
+                        Label:
+                            text: "Max. Size [mas]"
+                        TextInput:
+                            text: "5"
+                            id: max_model_size
+                    BoxLayout:
+                        size_hint_y: 0.05
+                        size_hint_x: 1
+                        orientation: "horizontal"
+                        Label:
+                            text: "Max. Dist [mas]"
+                        TextInput:
+                            text: "5"
+                            id: max_model_dist
+                        Label:
+                            text: "Fit Circ?"
+                        CheckBox:
+                            id: fit_circ
+                    BoxLayout:
+                        size_hint_y: 0.40
+                BoxLayout
+                    id: box_right_modelfit
+                    orientation: "vertical"
+                    padding: 20
+                    MatplotFigure:
+                        size_hint_y: 0.5
+                        id: modelfit_image
+                    MatplotFigure:
+                        size_hint_y: 0.5
+                        id: modelfit_radplot
     TabbedPanelItem:
         text: 'Stacking'
         background_color: (1, .5, 0, 1)
@@ -767,21 +1376,6 @@
                                 active: True
                             Label:
                                 text: "Align Images?"
-                            CheckBox:
-                                id: stack_stokes_check
-                                group: "stack_mode"
-                                active: True
-                            Label:
-                                text: "Stack I,Q,U"
-                            CheckBox:
-                                id: weighted_check
-                            Label:
-                                text: "Weight EVPA stack by lin. pol.?"
-                            CheckBox:
-                                id: stack_pol_check
-                                group: "stack_mode"
-                            Label:
-                                text: "Stack I, lin. Pol, EVPA"
                     Button:
                         size_hint_y:0.1
                         text: "Do Stacking"

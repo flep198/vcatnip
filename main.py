@@ -7,20 +7,21 @@ from kivy.uix.label import Label
 from kivy.properties import ObjectProperty, StringProperty, ListProperty
 from kivy.uix.button import Button
 from kivy.uix.checkbox import CheckBox
-from kivy.uix.anchorlayout import AnchorLayout
 from graph_widget import MatplotFigure
 from kivy.utils import platform
-from kinematics import ComponentCollection
 import numpy as np
-from graph_generator import FitsImage, ImageData, KinematicPlot, get_date, getComponentInfo
 from astroquery.ipac.ned import Ned
 from astropy.io import fits
+from astropy.time import Time
 import os
 import pandas as pd
 import glob
-from stack_images import stack_fits, stack_pol_fits, get_common_beam, fold_with_beam
+from matplotlib.patches import Ellipse
+from vcat.stacking_helpers import stack_fits, stack_pol_fits, fold_with_beam, modelfit_ehtim_pol, modelfit_ehtim_full_pol, modelfit_difmap
+from vcat.kinematics import ComponentCollection, Component
+from vcat import FitsImage, ImageData, KinematicPlot, ImageCube
+from vcat.helpers import get_date, get_common_beam, write_mod_file_from_components, get_residual_map, Jy2JyPerBeam, JyPerBeam2Jy
 from mojave_db_access import upload_csv_to_MOJAVE, download_kinematic_from_MOJAVE, query_models, check_password
-import subprocess
 
 
 #avoid conflict between mouse provider and touch (very important with touch device)
@@ -38,6 +39,20 @@ class FileSavePopup(Popup):
     def load_filepath_to_view(self, selection):
         if selection!=[]:
             self.ids.filename_save.text = str(selection[0])
+
+class ExportMoviePopup(Popup):
+    load = ObjectProperty()
+
+    def load_filepath_to_view(self, selection):
+        if selection!=[]:
+            self.ids.export_movie_save.text = str(selection[0])
+
+class ModelfitExportPopup(Popup):
+    load = ObjectProperty()
+
+    def load_filepath_to_view(self, selection):
+        if selection!=[]:
+            self.ids.export_modelfit_save.text = str(selection[0])
 
 class PlotExportPopup(Popup):
     load = ObjectProperty()
@@ -78,6 +93,13 @@ class ModelFits(TabbedPanel):
     component_collections = []
     mojave_password=""
 
+    #### MODELFIT variables
+    modelfit_plots = []
+    modelfit_plot_buttons = []
+    current_modelfit_residual_plot = []
+    new_modelfit_component_coords = []
+    current_new_ellipse_plot = []
+
     #### STACKING variables
     stacking_single_plots = []
     stacking_single_plot_buttons = []
@@ -113,14 +135,19 @@ class ModelFits(TabbedPanel):
 
     def sort_fits_by_date(self,fits_files):
         fits_files = np.array(fits_files)
-        if len(fits_files)>0:
-            date=[]
 
-            for filepath in fits_files:
-                date=np.append(date,get_date(filepath))
+        try:
+            if len(fits_files)>0:
+                date=[]
 
-            args = date.argsort()
-            fits_files = fits_files[args]
+                for filepath in fits_files:
+                    date=np.append(date,get_date(filepath))
+
+                args = date.argsort()
+                fits_files = fits_files[args]
+        except:
+            pass
+
         return fits_files.tolist()
 
     def sort_uvf_by_date(self,uvf_files):
@@ -157,7 +184,10 @@ class ModelFits(TabbedPanel):
         combined = selection + self.modelfit_filepaths
 
         # sort by date
-        self.modelfit_filepaths = self.sort_fits_by_date(combined)
+        try:
+            self.modelfit_filepaths = self.sort_fits_by_date(combined)
+        except:
+            pass
         try:
             self.the_popup.dismiss()
         except:
@@ -258,6 +288,10 @@ class ModelFits(TabbedPanel):
         self.save_dialog = FileSavePopup()
         self.save_dialog.open()
 
+    def open_movie_dialog(self):
+        self.movie_dialog = ExportMoviePopup()
+        self.movie_dialog.open()
+
     def open_import_dialog(self):
         self.import_dialog = FileImportPopup()
         self.import_dialog.open()
@@ -280,7 +314,6 @@ class ModelFits(TabbedPanel):
         else:
             output_text="No models found in the MOJAVE DB"
         self.show_popup("Available MOJAVE models",output_text,"Continue")
-
 
 
     def current_color(self,ind):
@@ -335,30 +368,31 @@ class ModelFits(TabbedPanel):
             #create plots for view page
             for ind,filepath in enumerate(modelfit_files_to_plot):
                 if not len(uvf_files_to_plot) == len(modelfit_files_to_plot):
-                    plot_data=ImageData(clean_files_to_plot[ind],model=filepath,noise_method=self.noise_method)
+                    plot_data=ImageData(clean_files_to_plot[ind],model=filepath,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                     warn_uvf=True
                 else:
                     plot_data = ImageData(clean_files_to_plot[ind], model=filepath, uvf_file=uvf_files_to_plot[ind],
-                                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
-                plot=FitsImage(plot_data,overplot_gauss=True)
+                                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
+                plot=FitsImage(plot_data,plot_model=True,adjust_comp_size_to_res_lim=True)
                 fits_images=np.append(fits_images,plot)
             self.show_popup("Information", "File loading completed. Have fun doing kinematics!", "Continue")
             if warn_uvf:
                 self.show_popup("Warning",
                                 "No .uvf files loaded, will not be able to calculate good upper limits for TB!",
                                 "Continue")
+
         #otherwise check if no clean maps were provided and only modelfit maps
         elif len(clean_files_to_plot) == 0 and len(modelfit_files_to_plot)>0:
             # create plots for view page
             warn_uvf=False
             for ind,filepath in enumerate(modelfit_files_to_plot):
                 if not len(uvf_files_to_plot) == len(modelfit_files_to_plot):
-                    plot_data = ImageData(filepath,model=filepath,noise_method=self.noise_method)
+                    plot_data = ImageData(filepath,model=filepath,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                     warn_uvf=True
                 else:
                     plot_data = ImageData(filepath, model=filepath, uvf_file=uvf_files_to_plot[ind],
-                                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
-                plot = FitsImage(plot_data,overplot_gauss=True)
+                                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
+                plot = FitsImage(plot_data,plot_model=True,adjust_comp_size_to_res_lim=True)
                 fits_images = np.append(fits_images, plot)
             self.show_popup("Warning",
                             "No clean images imported, using only modelfit images.\n Have fun doing kinematics!",
@@ -429,20 +463,20 @@ class ModelFits(TabbedPanel):
             #create new ImageData object
             try:
                 plot_data=ImageData(self.clean_filepaths[ind], model=self.modelfit_filepaths[ind], uvf_file=self.uvf_filepaths[ind],
-                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method)
+                          difmap_path=self.ids.difmap_path.text,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
             except:
                 try:
                     plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],
-                                        uvf_file=self.uvf_filepaths[ind],noise_method=self.noise_method)
+                                        uvf_file=self.uvf_filepaths[ind],noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 except:
                     try:
                         plot_data=ImageData(self.clean_filepaths[ind],model=self.modelfit_filepaths[ind],
-                                            noise_method=self.noise_method)
+                                            noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                     except:
                         plot_data=ImageData(self.modelfit_filepaths[ind],model=self.modelfit_filepaths[ind],
-                                            noise_method=self.noise_method)
+                                            noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
 
-            plot = FitsImage(plot_data, overplot_gauss=True)
+            plot = FitsImage(plot_data, plot_model=True, adjust_comp_size_to_res_lim=True)
             #create Figure
             new_figure = MatplotFigure(size_hint_x=None,
                                        width=100)
@@ -714,16 +748,15 @@ class ModelFits(TabbedPanel):
         # find out which plot is currently selected:
         active_button = next((t for t in ToggleButton.get_widgets('kinematic_select') if t.state == 'down'), None)
 
-
         plots_to_fit=self.plots
 
         #check for chi-square plot
-        #TODO Make it seperate for every frequency!!
+        #TODO Make it separate for every frequency!!
         if active_button != None and active_button.text == "Chi-Square":
             self.kplot.plot_chi_square(self.uvf_filepaths, self.modelfit_filepaths, self.ids.difmap_path.text)
 
 
-        #calculate Core Shift based on modelfits
+        #calculate Core Shift based on modelfits TODO update this with new capability in VCAT
         if active_button != None and active_button.text == "Core Shift" and len(plots_to_fit)>0:
             t_max=0
             t_min=plots_to_fit[0].components[0][1].year
@@ -852,7 +885,7 @@ class ModelFits(TabbedPanel):
                 comp_collection=ComponentCollection(collection,name=self.components[i])
                 self.component_collections.append(comp_collection)
 
-                if active_button != None and active_button.text == "Flux Density":
+                if active_button != None and active_button.text == "Flux":
                     self.kplot.plot_fluxs(comp_collection,self.current_color(i))
                     self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
                                           [0, 1.2 * flux_max])
@@ -864,10 +897,13 @@ class ModelFits(TabbedPanel):
                     self.kplot.plot_kinematics(comp_collection,self.current_color(i))
                     self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
                                           [0, 1.2 * d_max])
+                elif active_button != None and active_button.text == "PA":
+                    self.kplot.plot_pas(comp_collection, self.current_color(i))
+                    self.kplot.set_limits([t_min - 0.1 * (t_max - t_min), t_max + 0.1 * (t_max - t_min)],
+                                          [0, 1.2 * d_max])
 
-
-                fit_data = comp_collection.get_speed()
                 if (active_button != None) and (len(collection)>2) and (active_button.text == "Kinematic"):
+                    fit_data = comp_collection.get_speed()[0]
                     self.kplot.plot_linear_fit(t_min-0.1*(t_max-t_min),t_max+0.1*(t_max-t_min),
                                             fit_data["speed"],
                                             fit_data["y0"],self.current_color(i),
@@ -1025,6 +1061,86 @@ class ModelFits(TabbedPanel):
         self.component_info_csv=save_path + '/component_info.csv'
         self.show_mojave_popup()
 
+    #used to export movie from kinematics
+    def save_movie(self,popup,save_text,selection):
+
+        save_path = str(selection[0])
+
+        # set default file name if name was not specified
+        if save_text == str(selection[0]):
+            save_path = save_path + "/movie.mp4"
+        else:
+            save_path = save_text
+
+        #create ImageCube
+        images=[]
+        for plot in self.plots:
+            image_data=plot.clean_image
+            comps=[]
+            for comp in plot.components:
+                comps.append(comp[1])
+            image_data.components=comps
+            images.append(image_data)
+
+        im_cube=ImageCube(images)
+
+        #extract plot settings from popup
+        if popup.ids.movie_plot_mode=="Stokes I":
+            plot_mode="stokes_i"
+        elif popup.ids.movie_plot_mode=="Lin. Pol.":
+            plot_mode="lin_pol"
+        elif popup.ids.movie_plot_mode=="Frac. Pol.":
+            plot_mode="frac_pol"
+        else:
+            plot_mode="stokes_i"
+        #TODO potentially add spix....
+        duration = float(popup.ids.movie_duration.text)
+        fps = float(popup.ids.movie_fps.text)
+
+        interval=int(1000/fps)
+        n_frames=int(fps*duration)
+
+        args={
+            "n_frames": n_frames,
+            "interval": interval,
+            "fps": fps,
+            "freq": popup.ids.movie_freq.text,
+            "plot_mode": plot_mode,
+            "plot_components": popup.ids.movie_overplot_gauss.active,
+            "im_colormap": popup.ids.movie_im_colormap.active,
+            "im_color": popup.ids.movie_im_color.text,
+            "contour": popup.ids.movie_contour.active,
+            "stokes_i_sigma_cut": float(popup.ids.movie_stokes_i_sigma_cut.text),
+            "contour_color": popup.ids.movie_contour_color.text,
+            "contour_cmap": popup.ids.movie_contour_cmap.text,
+            "contour_alpha": float(popup.ids.movie_contour_alpha.text),
+            "contour_width": float(popup.ids.movie_contour_width.text),
+            "component_color": popup.ids.movie_component_color.text,
+            "rcparams": popup.ids.movie_rcparams.text,
+            "background_color": popup.ids.movie_background_color.text,
+            "plot_beam": popup.ids.movie_plot_beam.active,
+            "xlim": [float(popup.ids.movie_ra_max.text),float(popup.ids.movie_ra_min.text)],
+            "ylim": [float(popup.ids.movie_dec_min.text),float(popup.ids.movie_dec_max.text)],
+            "plot_evpa": popup.ids.movie_plot_evpa.active,
+            "rotate_evpa": float(popup.ids.movie_rotate_evpa.text),
+            "evpa_len": float(popup.ids.movie_evpa_len.text),
+            "evpa_distance": float(popup.ids.movie_evpa_distance.text),
+            "evpa_color": popup.ids.movie_evpa_color.text,
+            "evpa_width": float(popup.ids.movie_evpa_width.text),
+            "lin_pol_sigma_cut": float(popup.ids.movie_lin_pol_sigma_cut.text),
+            "save":save_path
+              }
+
+        #Check if we need to convolve with the common beam
+        if popup.ids.movie_convolve.active:
+            im_cube=im_cube.restore()
+
+        #create movie
+        im_cube.movie(**args)
+
+        popup.dismiss()
+
+
     def show_mojave_popup(self):
         self.the_popup = MOJAVEExportPopup()
         self.the_popup.open()
@@ -1152,6 +1268,466 @@ class ModelFits(TabbedPanel):
 
     #### END OF KINEMATIC FUNCTIONS
 
+    #### START OF MODELFIT FUNCTIONS
+
+    def load_modelfit_files(self):
+
+        # TODO some basic background checks on the files to see if they are valid and if they exist (write some popups)
+        # TODO also check for polarizations. If there is only Stokes I input, grey out the polarization stacking options
+        modelfit_pol_loaded=False
+
+        if len(self.uvf_filepaths) != len(self.clean_filepaths):
+            self.show_popup("Error","Please load an equal number of clean files and .uvf files!","Continue")
+            return 0
+
+        for ind, file in enumerate(self.clean_filepaths):
+            uvf_file = self.uvf_filepaths[ind]
+            if len(self.modelfit_filepaths) > ind:
+                model = self.modelfit_filepaths[ind]
+                plot_model = True
+                plot_comp_ids = True
+            else:
+                model = ""
+                plot_model = False
+                plot_comp_ids = False
+            if len(self.stokes_u_filepaths) > ind and len(self.stokes_q_filepaths) > ind:
+                plot_data = ImageData(file, model=model, uvf_file=uvf_file, stokes_u=self.stokes_u_filepaths[ind],
+                                      stokes_q=self.stokes_q_filepaths[ind], noise_method=self.noise_method,fit_comp_polarization=True,is_ehtim_model=self.ids.is_ehtim_model.active)
+                image = FitsImage(plot_data, plot_mode="lin_pol", plot_model=plot_model, plot_comp_ids=plot_comp_ids,
+                                  plot_evpa=True, evpa_color="black", contour_color="grey")
+
+            else:
+                plot_data = ImageData(file, model=model, uvf_file=uvf_file, noise_method=self.noise_method,fit_comp_polarization=True,is_ehtim_model=self.ids.is_ehtim_model.active)
+                image = FitsImage(plot_data, plot_mode="lin_pol", plot_model=plot_model, plot_comp_ids=plot_comp_ids,
+                                  plot_evpa=True, evpa_color="black", contour_color="grey")
+
+
+            # check if polarization information was given:
+            if np.sum(image.clean_image.stokes_q) == 0 or np.sum(image.clean_image.stokes_u) == 0:
+                #TODO disable polarization options
+                modelfit_pol_loaded=False
+                pass
+            else:
+                modelfit_pol_loaded=True
+
+            self.modelfit_plots.append(image)
+
+            button = ToggleButton(
+                text=str(get_date(file)),
+                size_hint_y=None,
+                size_hint_x=1,
+                height=50,
+                group="modelfit_plots",
+            )
+            button.bind(on_release=self.change_modelfit_plot)
+
+            self.modelfit_plot_buttons.append(button)
+            self.ids.modelfit_list.add_widget(button)
+
+            # select first button by default
+            try:
+                self.modelfit_plot_buttons[0].state = "down"
+                self.change_modelfit_plot(self.modelfit_plot_buttons[0])
+            except:
+                pass
+        if not modelfit_pol_loaded:
+            self.show_popup("Warning", "Data loaded successfully, \n but no valid polarization data detected",
+                            "Continue")
+        else:
+            self.show_popup("Success", "Loaded data including polarization!", "Continue")
+
+    def change_modelfit_plot(self,button=""):
+        try:
+            ind = np.where(np.array(self.modelfit_plot_buttons) == button)[0][0]
+        except:
+            for i1, but in enumerate(self.ids.modelfit_list.children):
+                i1 = len(self.ids.modelfit_list.children) - 1 - i1
+                if but.state == "down":
+                    ind=i1
+            try:
+                ind
+            except:
+                return None
+
+        self.ids.modelfit_image.figure = self.modelfit_plots[ind].fig
+
+        self.ids.modelfit_component_list.clear_widgets()
+        self.modelfit_component_buttons=[]
+
+        #read out components attached to the ImageData object
+        comps=self.modelfit_plots[ind].clean_image.components
+
+        #add them to the component list
+        for comp in comps:
+            button = ToggleButton(
+                text="Component " + str(comp.component_number),
+                size_hint_y=None,
+                size_hint_x=1,
+                height=50,
+                group="modelfit_components",
+            )
+            button.bind(on_release=self.change_modelfit_component_select)
+
+            self.modelfit_component_buttons.append(button)
+            self.ids.modelfit_component_list.add_widget(button)
+
+        #create temporary working directory
+        os.system("rm -rf " + "/tmp/tmp_data_vcat/")
+        os.makedirs("/tmp/tmp_data_vcat", exist_ok=True)
+
+        if self.ids.modelfit_method.text=="Stokes I/DIFMAP":
+            #write .mod files
+            write_mod_file_from_components(comps,"i","/tmp/tmp_data_vcat/i_model.mod")
+
+            #calculate new residual plot
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file,"/tmp/tmp_data_vcat/i_model.mod","/tmp/tmp_data_vcat/i_model.mod",
+                             difmap_path=self.ids.difmap_path.text, save_location="/tmp/tmp_data_vcat/i_res.fits",
+                             npix=len(self.modelfit_plots[ind].clean_image.X)*2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
+
+            #create residual plot
+            res_image = ImageData("/tmp/tmp_data_vcat/i_res.fits")
+            res_image.residual_map = res_image.Z
+            res_plot = res_image.plot(plot_mode="residual",contour=False,title="Residual Map",component_color="green")
+
+            #get current modelfit plot (right)
+            modelfit_image = ImageData(self.modelfit_plots[ind].clean_image.fits_file).plot()
+
+            for comp in comps:
+                res_plot.plotComponent(comp.x,comp.y,comp.maj,comp.min,comp.pos,comp.scale,fillcolor="",id=comp.component_number)
+                modelfit_image.plotComponent(comp.x,comp.y,comp.maj,comp.min,comp.pos,comp.scale,fillcolor="",id=comp.component_number)
+
+        elif self.ids.modelfit_method.text=="Lin. Pol./ehtim":
+            #write .mod files
+            write_mod_file_from_components(comps, "q", "/tmp/tmp_data_vcat/q_model.mod")
+            write_mod_file_from_components(comps, "u", "/tmp/tmp_data_vcat/u_model.mod")
+            #calculate residual maps
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/q_model.mod","/tmp/tmp_data_vcat/q_model.mod",difmap_path=self.ids.difmap_path.text,
+                             channel="q", save_location="/tmp/tmp_data_vcat/q_res.fits", npix=len(self.modelfit_plots[ind].clean_image.X)*2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/u_model.mod","/tmp/tmp_data_vcat/u_model.mod",difmap_path=self.ids.difmap_path.text,
+                             channel="u", save_location="/tmp/tmp_data_vcat/u_res.fits", npix=len(self.modelfit_plots[ind].clean_image.X)*2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
+
+            #create residual image
+            res_image = ImageData(self.modelfit_plots[ind].clean_image.fits_file,
+                                  stokes_q="/tmp/tmp_data_vcat/q_res.fits", stokes_u="/tmp/tmp_data_vcat/u_res.fits")
+
+            res_plot = res_image.plot(plot_mode="lin_pol", plot_evpa=True,title="Residual Map")
+            # get current modelfit plot (right)
+            modelfit_image = ImageData(self.modelfit_plots[ind].clean_image.fits_file,
+                                       stokes_q=self.modelfit_plots[ind].clean_image.stokes_q_path,
+                                       stokes_u=self.modelfit_plots[ind].clean_image.stokes_u_path).plot(plot_mode="lin_pol",plot_evpa=True)
+
+            for comp in comps:
+                res_plot.plotComponent(comp.x,comp.y,comp.maj,comp.min,comp.pos,comp.scale,fillcolor="",id=comp.component_number,evpa=comp.evpa)
+                modelfit_image.plotComponent(comp.x, comp.y, comp.maj, comp.min, comp.pos, comp.scale, fillcolor="",
+                                       id=comp.component_number, evpa=comp.evpa)
+
+        elif self.ids.modelfit_method.text=="Full Pol./ehtim":
+            #write .mod files
+            write_mod_file_from_components(comps, "i", "/tmp/tmp_data_vcat/i_model.mod")
+            write_mod_file_from_components(comps, "q", "/tmp/tmp_data_vcat/q_model.mod")
+            write_mod_file_from_components(comps, "u", "/tmp/tmp_data_vcat/u_model.mod")
+            #calculate residual maps
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/i_model.mod","/tmp/tmp_data_vcat/i_model.mod",
+                             difmap_path=self.ids.difmap_path.text,
+                             channel="i", save_location="/tmp/tmp_data_vcat/i_res.fits",
+                             npix=len(self.modelfit_plots[ind].clean_image.X) * 2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp * self.modelfit_plots[
+                                 ind].clean_image.scale)
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/q_model.mod", "/tmp/tmp_data_vcat/q_model.mod",
+                             difmap_path=self.ids.difmap_path.text,
+                             channel="q", save_location="/tmp/tmp_data_vcat/q_res.fits", npix=len(self.modelfit_plots[ind].clean_image.X)*2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
+            get_residual_map(self.modelfit_plots[ind].clean_image.uvf_file, "/tmp/tmp_data_vcat/u_model.mod","/tmp/tmp_data_vcat/u_model.mod",
+                             difmap_path=self.ids.difmap_path.text,
+                             channel="u", save_location="/tmp/tmp_data_vcat/u_res.fits", npix=len(self.modelfit_plots[ind].clean_image.X)*2,
+                             pxsize=self.modelfit_plots[ind].clean_image.degpp*self.modelfit_plots[ind].clean_image.scale)
+
+            #create residual image
+            res_image = ImageData("/tmp/tmp_data_vcat/i_res.fits",
+                                  stokes_q="/tmp/tmp_data_vcat/q_res.fits", stokes_u="/tmp/tmp_data_vcat/u_res.fits")
+
+            res_plot = res_image.plot(plot_mode="lin_pol", plot_evpa=True,title="Residual Map")
+            # get current modelfit plot (right)
+            modelfit_image = ImageData(self.modelfit_plots[ind].clean_image.fits_file,
+                                       stokes_q=self.modelfit_plots[ind].clean_image.stokes_q_path,
+                                       stokes_u=self.modelfit_plots[ind].clean_image.stokes_u_path).plot(plot_mode="lin_pol",plot_evpa=True)
+
+            for comp in comps:
+                res_plot.plotComponent(comp.x,comp.y,comp.maj,comp.min,comp.pos,comp.scale,fillcolor="",id=comp.component_number,evpa=comp.evpa)
+                modelfit_image.plotComponent(comp.x, comp.y, comp.maj, comp.min, comp.pos, comp.scale, fillcolor="",
+                                       id=comp.component_number, evpa=comp.evpa)
+        #assign image
+        self.ids.modelfit_residual_image.figure = res_plot.fig
+        self.ids.modelfit_image.figure = modelfit_image.fig
+        self.current_modelfit_residual_plot = res_plot
+
+
+    def change_modelfit_component_select(self,button=""):
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1 = len(self.ids.modelfit_list.children) - 1 - i1
+            if but.state=="down":
+                for ind,button in enumerate(self.ids.modelfit_component_list.children):
+                    ind=len(self.ids.modelfit_component_list.children)-1-ind
+                    if button.state == "down":
+                        #find current component
+                        current_comp=self.modelfit_plots[i1].clean_image.components[ind]
+
+                        #set parameters
+                        self.ids.component_flux.text=f"{current_comp.flux*1e3:.2f}"
+                        self.ids.component_pos.text=f"{current_comp.pos:.2f}"
+                        self.ids.component_maj.text=f"{current_comp.maj*current_comp.scale:.2f}"
+                        self.ids.component_min.text=f"{current_comp.min*current_comp.scale:.2f}"
+                        self.ids.component_x.text=f"{current_comp.x*current_comp.scale:.2f}"
+                        self.ids.component_y.text=f"{current_comp.y*current_comp.scale:.2f}"
+                        self.ids.component_lin_pol.text=f"{current_comp.lin_pol*1e3:.2f}"
+                        self.ids.component_evpa.text=f"{current_comp.evpa:.2f}"
+
+    #Function to add new modelfit component
+    def add_modelfit_component(self):
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1 = len(self.ids.modelfit_list.children) - 1 - i1
+            if but.state == "down":
+                image_data=self.modelfit_plots[i1].clean_image
+                self.modelfit_plots[i1].clean_image.components.append(
+                    Component(float(self.ids.component_x.text)/image_data.scale,
+                              float(self.ids.component_y.text)/image_data.scale,
+                              float(self.ids.component_maj.text)/image_data.scale,
+                              float(self.ids.component_min.text)/image_data.scale,
+                              float(self.ids.component_pos.text),
+                              float(self.ids.component_flux.text)*1e-3,
+                              image_data.date,image_data.mjd,Time(image_data.date).decimalyear,
+                              lin_pol=float(self.ids.component_lin_pol.text) * 1e-3,
+                              evpa=float(self.ids.component_evpa.text),
+                              scale=image_data.scale,component_number=len(image_data.components)))
+
+                #reload plots
+                self.change_modelfit_plot(but)
+
+    #Function to remove modelfit component
+    def remove_modelfit_component(self,button=""):
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1 = len(self.ids.modelfit_list.children) - 1 - i1
+            if but.state == "down":
+                for ind,button in enumerate(self.ids.modelfit_component_list.children):
+                    if button.state == "down":
+                        ind = len(self.ids.modelfit_component_list.children) - 1 - ind
+                        self.modelfit_plots[i1].clean_image.components.pop(ind)
+
+                        # reload plots
+                        self.change_modelfit_plot(but)
+
+    def update_modelfit_component(self,button=""):
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1=len(self.ids.modelfit_list.children)-1-i1
+            if but.state == "down":
+                for ind,button in enumerate(self.ids.modelfit_component_list.children):
+                    if button.state == "down":
+                        ind = len(self.ids.modelfit_component_list.children) - 1 - ind
+                        comp=self.modelfit_plots[i1].clean_image.components[ind]
+                        try:
+                            self.modelfit_plots[i1].clean_image.components[ind].flux=float(self.ids.component_flux.text)*1e-3
+                            self.modelfit_plots[i1].clean_image.components[ind].x = float(self.ids.component_x.text)/comp.scale
+                            self.modelfit_plots[i1].clean_image.components[ind].y = float(self.ids.component_y.text)/comp.scale
+                            self.modelfit_plots[i1].clean_image.components[ind].pos = float(self.ids.component_pos.text)
+                            self.modelfit_plots[i1].clean_image.components[ind].maj = float(self.ids.component_maj.text)/comp.scale
+                            self.modelfit_plots[i1].clean_image.components[ind].min = float(self.ids.component_min.text)/comp.scale
+                            self.modelfit_plots[i1].clean_image.components[ind].lin_pol = float(self.ids.component_lin_pol.text)*1e-3
+                            self.modelfit_plots[i1].clean_image.components[ind].evpa = float(self.ids.component_evpa.text)
+                        except:
+                            pass
+                        # reload plots
+                        self.change_modelfit_plot(but)
+
+    #TODO load modelfit from other image as start model
+    def load_modelfit_components(self):
+        pass
+
+    def do_modelfit(self,button=""):
+        #find currently selected image
+        ind=-1
+        final_but=0
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1 = len(self.ids.modelfit_list.children) - 1 - i1
+            if but.state == "down":
+                ind=i1
+                final_but=but
+
+        if ind==-1:
+            self.show_popup("Error","Please select a file from the file list first!", "Continue")
+            return None
+
+        #get current components
+        comps=self.modelfit_plots[ind].clean_image.components
+        if len(comps)==0:
+            self.show_popup("Error", "Please add components first!", "Continue")
+
+        if self.ids.modelfit_method.text=="Stokes I/DIFMAP":
+            write_mod_file_from_components(self.modelfit_plots[ind].clean_image.components, "i", export="/tmp/mod.mod", adv=True)
+            self.modelfit_plots[ind].clean_image.components=modelfit_difmap(self.modelfit_plots[ind].clean_image.uvf_file,
+                                                                            "/tmp/mod.mod",int(self.ids.modelfit_count.text),
+                                                                            difmap_path=self.ids.difmap_path.text,
+                                                                            components=self.modelfit_plots[ind].clean_image.components)
+            self.modelfit_plots[ind].clean_image.fit_comp_polarization()
+        elif self.ids.modelfit_method.text=="Lin. Pol./ehtim":
+            if self.ids.modelfit_minimizer.text=="Dynesty Dynamic":
+                minimizer="dynesty_dynamic"
+            else:
+                minimizer="scipy.optimize.minimize"
+            self.modelfit_plots[ind].clean_image.components=modelfit_ehtim_pol(self.modelfit_plots[ind].clean_image.uvf_file,
+                                                                           comps,int(self.ids.modelfit_count.text),
+                                                                           npix=self.ids.modelfit_npix.text,
+                                                                           fov=self.ids.modelfit_fov.text,
+                                                                            minimizer=minimizer,
+                                                                           nwalker=int(self.ids.nwalker_count.text),
+                                                                            max_size=float(self.ids.max_model_size.text),
+                                                                            max_flux=float(self.ids.max_model_flux.text),
+                                                                            max_dist=float(self.ids.max_model_dist.text),
+                                                                            circ_gauss=self.ids.fit_circ.active)
+
+        elif self.ids.modelfit_method.text=="Full Pol./ehtim":
+            if self.ids.modelfit_minimizer.text=="Dynesty Dynamic":
+                minimizer="dynesty_dynamic"
+            else:
+                minimizer="scipy.optimize.minimize"
+            self.modelfit_plots[ind].clean_image.components=modelfit_ehtim_full_pol(self.modelfit_plots[ind].clean_image.uvf_file,
+                                                                           comps,int(self.ids.modelfit_count.text),
+                                                                           npix=self.ids.modelfit_npix.text,
+                                                                           fov=self.ids.modelfit_fov.text,
+                                                                            minimizer=minimizer,
+                                                                           nwalker=int(self.ids.nwalker_count.text),
+                                                                            max_size=float(self.ids.max_model_size.text),
+                                                                            max_flux=float(self.ids.max_model_flux.text),
+                                                                            max_dist=float(self.ids.max_model_dist.text),
+                                                                            circ_gauss=self.ids.fit_circ.active)
+
+
+        self.change_modelfit_plot(final_but)
+
+    def open_export_modelfit_popup(self,button=""):
+        if len(self.modelfit_plots) > 0:
+            self.export_modelfit_dialog = ModelfitExportPopup()
+            self.export_modelfit_dialog.open()
+
+    def set_residual_touch_mode(self,button="",mode="zoom"):
+        if mode=="zoom":
+            self.ids.modelfit_residual_image.touch_mode="cursor"
+        elif mode=="add_component":
+            self.ids.modelfit_residual_image.touch_mode="ellipseselect"
+            self.new_modelfit_component_coords=[]
+
+
+    def plot_new_modelfit_component(self,xdata,ydata):
+        self.new_modelfit_component_coords.append([xdata,ydata])
+
+        #find currently active plot
+        ind=-1
+        for i1, but in enumerate(self.ids.modelfit_list.children):
+            i1 = len(self.ids.modelfit_list.children) - 1 - i1
+            if but.state == "down":
+                ind = i1
+        if ind==-1:
+            return None
+
+        ax=self.current_modelfit_residual_plot.ax
+
+        n_points=len(self.new_modelfit_component_coords)
+        try:
+            self.current_new_ellipse_plot.remove()
+        except:
+            pass
+        if n_points==1:
+            #plot point
+            self.current_new_ellipse_plot  = ax.scatter(self.new_modelfit_component_coords[0][0],
+                                                        self.new_modelfit_component_coords[0][1])
+            ax.figure.canvas.draw_idle()
+            ax.figure.canvas.flush_events()
+        elif n_points==2:
+            #plot line
+            self.current_new_ellipse_plot,  = ax.plot([self.new_modelfit_component_coords[0][0],
+                                                       self.new_modelfit_component_coords[1][0]],
+                                                       [self.new_modelfit_component_coords[0][1],
+                                                        self.new_modelfit_component_coords[1][1]])
+            ax.figure.canvas.draw_idle()
+            ax.figure.canvas.flush_events()
+        elif n_points==3:
+            # add component as ellipse and empty new_modelfit_component_coords
+            #center of the ellipse
+            center_x, center_y = self.new_modelfit_component_coords[0][0], self.new_modelfit_component_coords[0][1]
+
+            #calculate one axis of the ellipse:
+            maj_x, maj_y = (self.new_modelfit_component_coords[1][0] - center_x ,
+                            self.new_modelfit_component_coords[1][1] - center_y)
+
+            #calculate the second axis of the ellipse
+            min_x, min_y = (self.new_modelfit_component_coords[2][0] - center_x ,
+                            self.new_modelfit_component_coords[2][1] - center_y)
+
+            maj=2*np.sqrt(maj_x**2+maj_y**2)
+            min=2*np.sqrt(min_x**2+min_y**2)
+
+            if maj<min:
+                maj_old=maj
+                maj=min
+                min=maj_old
+
+            #calculate position angle
+            PA=np.arctan2(maj_x,maj_y)/np.pi*180
+
+            if PA<-90:
+                PA+=180
+            elif PA>90:
+                PA-=180
+
+            #plot ellipse
+            self.current_new_ellipse_plot=Ellipse((center_x,center_y),width=maj,height=min,angle=-(PA+90))
+            ax.add_patch(self.current_new_ellipse_plot)
+
+            #modify the text boxes
+            self.ids.component_x.text=f"{center_x:.2f}"
+            self.ids.component_y.text=f"{center_y:.2f}"
+            self.ids.component_maj.text = f"{maj:.2f}"
+            self.ids.component_min.text = f"{min:.2f}"
+            self.ids.component_pos.text = f"{PA:.2f}"
+
+            #extract flux and linpol/EVPA from image within ellipse
+            # Get the indices of the ellipse in image space
+            self.current_modelfit_residual_plot.clean_image.masking(mask_type="reset")
+            self.current_modelfit_residual_plot.clean_image.masking(mask_type="ellipse",
+                                                                    args={'e_args':[maj,min,PA],
+                                                                          'e_xoffset': center_x,'e_yoffset': center_y})
+
+            mask=np.array(self.current_modelfit_residual_plot.clean_image.mask,dtype=bool)
+
+            if self.ids.modelfit_method.text == "Stokes I/DIFMAP":
+                flux=np.sum(self.current_modelfit_residual_plot.clean_image.residual_map[mask])
+            else:
+                flux = np.sum(self.current_modelfit_residual_plot.clean_image.Z[mask])
+            lin_pol=np.sum(self.current_modelfit_residual_plot.clean_image.lin_pol[mask])
+
+            try:
+                stokes_q = np.sum(self.current_modelfit_residual_plot.clean_image.stokes_q[mask])
+                stokes_u = np.sum(self.current_modelfit_residual_plot.clean_image.stokes_u[mask])
+                evpa=1/2*np.arctan2(stokes_u,stokes_q)
+            except:
+                evpa = 0
+
+            bmaj=self.modelfit_plots[i1].clean_image.beam_maj
+            bmin=self.modelfit_plots[i1].clean_image.beam_min
+            pxincr=self.current_modelfit_residual_plot.clean_image.degpp*self.current_modelfit_residual_plot.clean_image.scale
+
+
+            self.ids.component_flux.text = f"{JyPerBeam2Jy(flux,bmaj,bmin,pxincr)*1e3:.2f}"
+            self.ids.component_lin_pol.text = f"{JyPerBeam2Jy(lin_pol,bmaj,bmin,pxincr) * 1e3:.2f}"
+            self.ids.component_evpa.text = f"{evpa/np.pi*180:.2f}"
+
+
+            self.new_modelfit_component_coords=[]
+
+    #### END OF MODELFIT FUNCTIONS
+
     #### START OF STACKING FUNCTIONS
 
     def load_stacking_files(self):
@@ -1166,7 +1742,9 @@ class ModelFits(TabbedPanel):
                     model=self.modelfit_filepaths[ind]
                 else:
                     model=""
-                plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],stokes_q=self.stokes_q_filepaths[ind],noise_method=self.noise_method)
+                plot_data=ImageData(file,model=model,stokes_u=self.stokes_u_filepaths[ind],
+                                    stokes_q=self.stokes_q_filepaths[ind],noise_method=self.noise_method,
+                                    is_ehtim_model=self.ids.is_ehtim_model.active)
                 image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
             else:
                 #try to load model from clean .fits file
@@ -1174,16 +1752,9 @@ class ModelFits(TabbedPanel):
                     model=self.modelfit_filepaths[ind]
                 else:
                     model=""
-                plot_data=ImageData(file,model=model,noise_method=self.noise_method)
+                plot_data=ImageData(file,model=model,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
 
-            #check if polarization information was given:
-            if np.sum(image.clean_image.stokes_q)==0 or np.sum(image.clean_image.stokes_u)==0:
-                self.ids.weighted_check.disabled=True
-                self.ids.stack_pol_check.disabled=True
-                self.ids.stack_stokes_check.disabled=True
-                self.ids.stacked_image_linpol.disabled=True
-                self.ids.stacked_image_fracpol.disabled=True
 
             self.stacking_single_plots.append(image)
             button = ToggleButton(
@@ -1209,7 +1780,7 @@ class ModelFits(TabbedPanel):
                 self.change_stacking_single_plot(self.stacking_single_plot_buttons[0])
             except:
                 pass
-        if self.ids.weighted_check.disabled:
+        if np.sum(image.clean_image.stokes_q)==0 or np.sum(image.clean_image.stokes_u)==0:
             self.show_popup("Warning", "Only doing Stokes I stacking! \n No valid polarization data detected",
                             "Continue")
         else:
@@ -1267,60 +1838,49 @@ class ModelFits(TabbedPanel):
                 except:
                     pass
 
+        #create ImageData and ImageCube
+        im_datas=[]
+        for i in range(len(files_to_stack)):
+            try:
+                fits_q=files_to_stack_q[i]
+            except:
+                fits_q=""
+            try:
+                fits_u=files_to_stack_u[i]
+            except:
+                fits_u=""
+            try:
+                uvf_file=files_to_stack_uvf[i]
+            except:
+                uvf_file=""
+            try:
+                model=files_to_stack_models[i]
+            except:
+                model=""
+            try:
+                model=files_to_stack_casa_clean_models[i]
+                is_casa_model=True
+            except:
+                is_casa_model=False
+                try:
+                    model = files_to_stack_models[i]
+                except:
+                    model = ""
+
+
+            im_datas.append(ImageData(fits_file=files_to_stack[i],
+                                      stokes_q=fits_q,
+                                      stokes_u=fits_u,
+                                      uvf_file=uvf_file,
+                                      model=model,
+                                      is_casa_model=is_casa_model,
+                                      noise_method=self.noise_method,
+                                      is_ehtim_model=self.ids.is_ehtim_model.active
+                                      ))
+        im_cube=ImageCube(image_data_list=im_datas)
+
         #check if we need to restore the beam sizes first before proceeding
         if do_beam_restore:
-            difmap_path = self.ids.difmap_path.text ##TODO fix this, so difmap executable is found automatically!
-            mod_file_paths=[]
-            mod_file_paths_q=[]
-            mod_file_paths_u=[]
-
-            for i in range(len(files_to_stack)):
-                if models_loaded:
-                    image=ImageData(files_to_stack[i],model=files_to_stack_models[i],noise_method=self.noise_method)
-                else:
-                    image=ImageData(files_to_stack[i],noise_method=self.noise_method)
-                mod_file_paths.append("tmp/mod_files_clean/"+image.date+ "_" + "{:.0f}".format(image.freq/1e9).replace(".","_") + "GHz.mod")
-
-            if fold_polarization_beams:
-                try:
-                    #DIFMAP style
-                    for file in files_to_stack_q:
-                        image_q=ImageData(file,model_save_dir="tmp/mod_files_q/",noise_method=self.noise_method)
-                        mod_file_paths_q.append("tmp/mod_files_q/" + image_q.date + "_" +"{:.0f}".format(image_q.freq/1e9).replace(".","_") + "GHz.mod")
-                    if len(files_to_stack_q)==0:
-                        raise Exception()
-                except:
-                    # TRY to import CASA clean model
-                    try:
-                        for file in files_to_stack_casa_clean_models:
-                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method)
-                            mod_file_paths_q.append("tmp/mod_files_q/"+image_model.date+ "_" + "{:.0f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
-                            files_to_stack_q.append(file)
-                    except:
-                        self.show_popup("Error","Stokes Q .fits file does not contain clean model!","Continue")
-                        fold_polarization_beams=False
-
-                try:
-                    #DIFMAP style
-                    for file in files_to_stack_u:
-                        image_u=ImageData(file,model_save_dir="tmp/mod_files_u/",noise_method=self.noise_method)
-                        mod_file_paths_u.append("tmp/mod_files_u/"+image_u.date+ "_" + "{:.0f}".format(image_u.freq/1e9).replace(".","_") + "GHz.mod")
-                    if len(files_to_stack_u)==0:
-                        raise Exception()
-                except:
-                    try:
-                        # TRY to import CASA clean model
-                        for file in files_to_stack_casa_clean_models:
-                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method)
-                            mod_file_paths_u.append("tmp/mod_files_u/"+image_model.date+ "_" +"{:.0f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
-                            files_to_stack_u.append(file)
-                    except:
-                        self.show_popup("Error","Stokes U .fits file does not contain clean model!","Continue")
-                        fold_polarization_beams=False
-
-            degpp=image.degpp*image.scale
-            npix=len(image.X)
-
             #Restore Stokes I
             try:
                 restore_maj=float(self.ids.beam_maj.text)
@@ -1329,65 +1889,16 @@ class ModelFits(TabbedPanel):
             except:
                 self.show_popup("Error","Please set beam to restore with!","Continue")
 
-            fold_with_beam(files_to_stack, difmap_path=difmap_path, bmaj=restore_maj, bmin=restore_min, posa=restore_pa,
-                           output_dir="tmp/restored_fits", n_pixel=npix*4,
-                           pixel_size=degpp/2, mod_files=mod_file_paths,
-                           uvf_files=files_to_stack_uvf)
-
-            if fold_polarization_beams:
-                #Restores Stokes Q
-                fold_with_beam(files_to_stack, #input stokes I files here here to use the common beam from Stokes I!
-                               difmap_path=difmap_path, bmaj=restore_maj, bmin=restore_min, posa=restore_pa,
-                               channel="q", output_dir="tmp/restored_fits_q",
-                               n_pixel=npix * 4,
-                               pixel_size=degpp / 2, mod_files=mod_file_paths_q,
-                               uvf_files=files_to_stack_uvf)
-                for i in range(len(files_to_stack)):
-                    files_to_stack_q[i]="tmp/restored_fits_q/"+".".join(
-                        files_to_stack[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits"
-
-                #Restore Stokes U
-                fold_with_beam(files_to_stack, #input stokes I files here here to use the common beam from Stokes I!
-                               difmap_path=difmap_path, bmaj=restore_maj, bmin=restore_min, posa=restore_pa,
-                               channel="u", output_dir="tmp/restored_fits_u",
-                               n_pixel=npix * 4,
-                               pixel_size=degpp / 2, use_common_beam=True, mod_files=mod_file_paths_u,
-                               uvf_files=files_to_stack_uvf)
-                for i in range(len(files_to_stack)):
-                    files_to_stack_u[i]="tmp/restored_fits_u/"+".".join(
-                        files_to_stack[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits"
-
-            #change file names:
-            for i in range(len(files_to_stack)):
-                files_to_stack[i]="tmp/restored_fits/"+'.'.join(files_to_stack[i].split("/")[-1].split(".")[0:-1])+"_convolved.fits"
+            im_cube=im_cube.restore(beam_maj=restore_maj,beam_min=restore_min,beam_posa=restore_pa)
 
 
 
         align=self.ids.do_alignment_check.active
-        weighted=self.ids.weighted_check.active
-        if self.ids.stack_stokes_check.active:
-            output_stacked = stack_fits(files_to_stack,align=align,stokes_q_fits=files_to_stack_q,stokes_u_fits=files_to_stack_u)
-            if len(output_stacked) == 1:
-                stack_image = ImageData(files_to_stack[0],pol_from_stokes=True,noise_method=self.noise_method)
-                stack_image.Z = output_stacked[0][0]
-            elif len(output_stacked) > 1: #check for polarization
-                stack_image = ImageData(files_to_stack[0], stokes_i=output_stacked[0][0],
-                                        pol_from_stokes=True,stokes_q=output_stacked[1][0],stokes_u=output_stacked[2][0],
-                                        noise_method=self.noise_method)
-                stack_image.Z = output_stacked[0][0]
-                stack_image.stokes_q = output_stacked[1][0]
-                stack_image.stokes_u = output_stacked[2][0]
-                stack_image.lin_pol = np.sqrt(output_stacked[1][0]**2+output_stacked[2][0]**2)
-                stack_image.evpa=0.5*np.arctan2(output_stacked[2][0],output_stacked[1][0])
+        if align:
+            im_cube=im_cube.center()
 
-        elif self.ids.stack_pol_check.active:
-            output_stacked=stack_pol_fits(files_to_stack,weighted=weighted,align=align,stokes_u_fits=files_to_stack_u,stokes_q_fits=files_to_stack_q)
-            #create new image data with header info from first fits file
-            stack_image = ImageData(files_to_stack[0],pol_from_stokes=False,noise_method=self.noise_method)
-            stack_image.Z = output_stacked[0][0]
-            if len(output_stacked) > 1:  # check for polarization
-                stack_image.lin_pol = output_stacked[1][0]
-                stack_image.evpa = output_stacked[2][0]
+        stack_image=im_cube.stack(mode="all").images.flatten()[0]
+
         #create plot
         self.final_stack_image=stack_image
         self.ids.stacked_image_i.state="down"
@@ -1419,7 +1930,8 @@ class ModelFits(TabbedPanel):
             if box.active:
                 files_to_stack.append(self.clean_filepaths[ind])
         if len(files_to_stack)>0:
-            maj,min,pos=get_common_beam(files_to_stack)
+            im_cube=ImageCube().import_files(files_to_stack)
+            maj,min,pos=im_cube.get_common_beam()
             self.ids.beam_maj.text="{:.4f}".format(maj)
             self.ids.beam_min.text = "{:.4f}".format(min)
             self.ids.beam_pos.text = "{:.4f}".format(pos)
@@ -1448,10 +1960,10 @@ class ModelFits(TabbedPanel):
                 stokes_q_path = ""
 
             try:# import CASA STYLE models
-                ImageData(self.casa_clean_model_filepaths[ind],model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method)
+                ImageData(self.casa_clean_model_filepaths[ind],model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
             except:
                 pass
-            plot_data=ImageData(clean_path,model=model_path,stokes_q=stokes_q_path,stokes_u=stokes_u_path,noise_method=self.noise_method)
+            plot_data=ImageData(clean_path,model=model_path,stokes_q=stokes_q_path,stokes_u=stokes_u_path,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
             self.plotting_single_plots_data.append(plot_data)
             plot=FitsImage(plot_data)
             self.plotting_single_plots.append(plot)
@@ -1533,8 +2045,8 @@ class ModelFits(TabbedPanel):
                                                         contour_width = float(self.ids.contour_width.text),
                                                         im_color = self.ids.im_color.text,
                                                         plot_beam = self.ids.plot_beam.active,
-                                                        overplot_gauss = self.ids.overplot_gauss.active,
-                                                        overplot_clean = self.ids.overplot_clean.active,
+                                                        plot_model = self.ids.overplot_gauss.active,
+                                                        plot_clean = self.ids.overplot_clean.active,
                                                         component_color = self.ids.component_color.text,
                                                         xlim = xlim,
                                                         ylim = ylim,
@@ -1566,11 +2078,56 @@ class ModelFits(TabbedPanel):
         active_plot = self.plotting_single_plots[ind]
         active_plot.export(export_name)
 
+    def export_modelfit(self,export_name):
+        active_button = next((t for t in ToggleButton.get_widgets('modelfit_plots') if t.state == 'down'), None)
+        ind = np.where(np.array(self.modelfit_plot_buttons) == active_button)[0][0]
+        active_plot = self.modelfit_plots[ind]
 
+        # get current components
+        comps = active_plot.clean_image.components
+        if len(comps) == 0:
+            self.show_popup("Error", "Please add components first!", "Continue")
 
-
-
-
+        if self.ids.modelfit_method.text == "Stokes I/DIFMAP":
+            write_mod_file_from_components(comps, "i", export=export_name,adv=False)
+        elif self.ids.modelfit_method.text == "Lin. Pol./ehtim":
+            if self.ids.modelfit_minimizer.text == "Dynesty Dynamic":
+                minimizer = "dynesty_dynamic"
+            else:
+                minimizer = "scipy.optimize.minimize"
+            #we run ehtim with niter=0 and an export name to export the current model
+            self.modelfit_plots[ind].clean_image.components = modelfit_ehtim_pol(
+                self.modelfit_plots[ind].clean_image.uvf_file,
+                comps, 0,
+                npix=self.ids.modelfit_npix.text,
+                fov=self.ids.modelfit_fov.text,
+                minimizer=minimizer,
+                nwalker=int(self.ids.nwalker_count.text),
+                max_size=float(self.ids.max_model_size.text),
+                max_flux=float(self.ids.max_model_flux.text),
+                max_dist=float(self.ids.max_model_dist.text),
+                circ_gauss=self.ids.fit_circ.active,
+                export_model=export_name,
+                skip_fit=True)
+        elif self.ids.modelfit_method.text == "Full Pol./ehtim":
+            if self.ids.modelfit_minimizer.text == "Dynesty Dynamic":
+                minimizer = "dynesty_dynamic"
+            else:
+                minimizer = "scipy.optimize.minimize"
+            #we run ehtim with niter=0 and an export name to export the current model
+            self.modelfit_plots[ind].clean_image.components = modelfit_ehtim_full_pol(
+                self.modelfit_plots[ind].clean_image.uvf_file,
+                comps, 0,
+                npix=self.ids.modelfit_npix.text,
+                fov=self.ids.modelfit_fov.text,
+                minimizer=minimizer,
+                nwalker=int(self.ids.nwalker_count.text),
+                max_size=float(self.ids.max_model_size.text),
+                max_flux=float(self.ids.max_model_flux.text),
+                max_dist=float(self.ids.max_model_dist.text),
+                circ_gauss=self.ids.fit_circ.active,
+                export_model=export_name,
+                skip_fit=True)
 
 class VCAT(App):
 
@@ -1620,11 +2177,17 @@ class VCAT(App):
     def save_kinematics(self,save_text,selection):
         self.screen.save_kinematics(save_text,selection)
 
+    def save_movie(self,popup,save_text,selection):
+        self.screen.save_movie(popup,save_text,selection)
+
     def import_kinematics(self,directory):
         self.screen.import_kinematics(directory)
 
     def export_plotting_plot(self,name,selection):
         self.screen.export_plotting_plot(name)
+
+    def export_modelfit(self,name,selection):
+        self.screen.export_modelfit(name)
 
     def export_data_to_mojave(self,observer,password,source):
         self.screen.export_data_to_mojave(observer,password,source)
@@ -1637,7 +2200,10 @@ class VCAT(App):
 
     #### END OF KINEMATIC FUNCTIONS
 
-    #### START OF STACKING FUNCTIONS
+    #### START OF MODELFIT FUNCTIONS
+
+    def plot_new_modelfit_component(self,xdata,ydata):
+        self.screen.plot_new_modelfit_component(xdata,ydata)
 
 if __name__ == "__main__":
     VCAT().run()
