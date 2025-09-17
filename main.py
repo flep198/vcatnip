@@ -2129,7 +2129,7 @@ class ModelFits(TabbedPanel):
                 export_model=export_name,
                 skip_fit=True)
 
-class VCAT(App):
+class VCATNIP(App):
 
     def build(self):
         self.screen=ModelFits()
@@ -2206,4 +2206,4 @@ class VCAT(App):
         self.screen.plot_new_modelfit_component(xdata,ydata)
 
 if __name__ == "__main__":
-    VCAT().run()
+    VCATNIP().run()
