@@ -1755,13 +1755,6 @@ class ModelFits(TabbedPanel):
                 plot_data=ImageData(file,model=model,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
                 image=FitsImage(plot_data,plot_mode="frac_pol",plot_evpa=True,evpa_color="black",contour_color="grey")
 
-            #check if polarization information was given:
-            if np.sum(image.clean_image.stokes_q)==0 or np.sum(image.clean_image.stokes_u)==0:
-                self.ids.weighted_check.disabled=True
-                self.ids.stack_pol_check.disabled=True
-                self.ids.stack_stokes_check.disabled=True
-                self.ids.stacked_image_linpol.disabled=True
-                self.ids.stacked_image_fracpol.disabled=True
 
             self.stacking_single_plots.append(image)
             button = ToggleButton(
@@ -1787,7 +1780,7 @@ class ModelFits(TabbedPanel):
                 self.change_stacking_single_plot(self.stacking_single_plot_buttons[0])
             except:
                 pass
-        if self.ids.weighted_check.disabled:
+        if np.sum(image.clean_image.stokes_q)==0 or np.sum(image.clean_image.stokes_u)==0:
             self.show_popup("Warning", "Only doing Stokes I stacking! \n No valid polarization data detected",
                             "Continue")
         else:
@@ -1845,60 +1838,49 @@ class ModelFits(TabbedPanel):
                 except:
                     pass
 
+        #create ImageData and ImageCube
+        im_datas=[]
+        for i in range(len(files_to_stack)):
+            try:
+                fits_q=files_to_stack_q[i]
+            except:
+                fits_q=""
+            try:
+                fits_u=files_to_stack_u[i]
+            except:
+                fits_u=""
+            try:
+                uvf_file=files_to_stack_uvf[i]
+            except:
+                uvf_file=""
+            try:
+                model=files_to_stack_models[i]
+            except:
+                model=""
+            try:
+                model=files_to_stack_casa_clean_models[i]
+                is_casa_model=True
+            except:
+                is_casa_model=False
+                try:
+                    model = files_to_stack_models[i]
+                except:
+                    model = ""
+
+
+            im_datas.append(ImageData(fits_file=files_to_stack[i],
+                                      stokes_q=fits_q,
+                                      stokes_u=fits_u,
+                                      uvf_file=uvf_file,
+                                      model=model,
+                                      is_casa_model=is_casa_model,
+                                      noise_method=self.noise_method,
+                                      is_ehtim_model=self.ids.is_ehtim_model.active
+                                      ))
+        im_cube=ImageCube(image_data_list=im_datas)
+
         #check if we need to restore the beam sizes first before proceeding
         if do_beam_restore:
-            difmap_path = self.ids.difmap_path.text ##TODO fix this, so difmap executable is found automatically!
-            mod_file_paths=[]
-            mod_file_paths_q=[]
-            mod_file_paths_u=[]
-
-            for i in range(len(files_to_stack)):
-                if models_loaded:
-                    image=ImageData(files_to_stack[i],model=files_to_stack_models[i],noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-                else:
-                    image=ImageData(files_to_stack[i],noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-                mod_file_paths.append("tmp/mod_files_clean/"+image.date+ "_" + "{:.0f}".format(image.freq/1e9).replace(".","_") + "GHz.mod")
-
-            if fold_polarization_beams:
-                try:
-                    #DIFMAP style
-                    for file in files_to_stack_q:
-                        image_q=ImageData(file,model_save_dir="tmp/mod_files_q/",noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-                        mod_file_paths_q.append("tmp/mod_files_q/" + image_q.date + "_" +"{:.0f}".format(image_q.freq/1e9).replace(".","_") + "GHz.mod")
-                    if len(files_to_stack_q)==0:
-                        raise Exception()
-                except:
-                    # TRY to import CASA clean model
-                    try:
-                        for file in files_to_stack_casa_clean_models:
-                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-                            mod_file_paths_q.append("tmp/mod_files_q/"+image_model.date+ "_" + "{:.0f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
-                            files_to_stack_q.append(file)
-                    except:
-                        self.show_popup("Error","Stokes Q .fits file does not contain clean model!","Continue")
-                        fold_polarization_beams=False
-
-                try:
-                    #DIFMAP style
-                    for file in files_to_stack_u:
-                        image_u=ImageData(file,model_save_dir="tmp/mod_files_u/",noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-                        mod_file_paths_u.append("tmp/mod_files_u/"+image_u.date+ "_" + "{:.0f}".format(image_u.freq/1e9).replace(".","_") + "GHz.mod")
-                    if len(files_to_stack_u)==0:
-                        raise Exception()
-                except:
-                    try:
-                        # TRY to import CASA clean model
-                        for file in files_to_stack_casa_clean_models:
-                            image_model=ImageData(file,model_save_dir="tmp/",is_casa_model=True,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-                            mod_file_paths_u.append("tmp/mod_files_u/"+image_model.date+ "_" +"{:.0f}".format(image_model.freq/1e9).replace(".","_") + "GHz.mod")
-                            files_to_stack_u.append(file)
-                    except:
-                        self.show_popup("Error","Stokes U .fits file does not contain clean model!","Continue")
-                        fold_polarization_beams=False
-
-            degpp=image.degpp*image.scale
-            npix=len(image.X)
-
             #Restore Stokes I
             try:
                 restore_maj=float(self.ids.beam_maj.text)
@@ -1907,65 +1889,16 @@ class ModelFits(TabbedPanel):
             except:
                 self.show_popup("Error","Please set beam to restore with!","Continue")
 
-            fold_with_beam(files_to_stack, difmap_path=difmap_path, bmaj=restore_maj, bmin=restore_min, posa=restore_pa,
-                           output_dir="tmp/restored_fits", n_pixel=npix*4,
-                           pixel_size=degpp/2, mod_files=mod_file_paths,
-                           uvf_files=files_to_stack_uvf)
-
-            if fold_polarization_beams:
-                #Restores Stokes Q
-                fold_with_beam(files_to_stack, #input stokes I files here here to use the common beam from Stokes I!
-                               difmap_path=difmap_path, bmaj=restore_maj, bmin=restore_min, posa=restore_pa,
-                               channel="q", output_dir="tmp/restored_fits_q",
-                               n_pixel=npix * 4,
-                               pixel_size=degpp / 2, mod_files=mod_file_paths_q,
-                               uvf_files=files_to_stack_uvf)
-                for i in range(len(files_to_stack)):
-                    files_to_stack_q[i]="tmp/restored_fits_q/"+".".join(
-                        files_to_stack[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits"
-
-                #Restore Stokes U
-                fold_with_beam(files_to_stack, #input stokes I files here here to use the common beam from Stokes I!
-                               difmap_path=difmap_path, bmaj=restore_maj, bmin=restore_min, posa=restore_pa,
-                               channel="u", output_dir="tmp/restored_fits_u",
-                               n_pixel=npix * 4,
-                               pixel_size=degpp / 2, use_common_beam=True, mod_files=mod_file_paths_u,
-                               uvf_files=files_to_stack_uvf)
-                for i in range(len(files_to_stack)):
-                    files_to_stack_u[i]="tmp/restored_fits_u/"+".".join(
-                        files_to_stack[i].split("/")[-1].split(".")[0:-1]) + "_convolved.fits"
-
-            #change file names:
-            for i in range(len(files_to_stack)):
-                files_to_stack[i]="tmp/restored_fits/"+'.'.join(files_to_stack[i].split("/")[-1].split(".")[0:-1])+"_convolved.fits"
+            im_cube=im_cube.restore(beam_maj=restore_maj,beam_min=restore_min,beam_posa=restore_pa)
 
 
 
         align=self.ids.do_alignment_check.active
-        weighted=self.ids.weighted_check.active
-        if self.ids.stack_stokes_check.active:
-            output_stacked = stack_fits(files_to_stack,align=align,stokes_q_fits=files_to_stack_q,stokes_u_fits=files_to_stack_u)
-            if len(output_stacked) == 1:
-                stack_image = ImageData(files_to_stack[0],pol_from_stokes=True,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-                stack_image.Z = output_stacked[0][0]
-            elif len(output_stacked) > 1: #check for polarization
-                stack_image = ImageData(files_to_stack[0], stokes_i=output_stacked[0][0],
-                                        pol_from_stokes=True,stokes_q=output_stacked[1][0],stokes_u=output_stacked[2][0],
-                                        noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-                stack_image.Z = output_stacked[0][0]
-                stack_image.stokes_q = output_stacked[1][0]
-                stack_image.stokes_u = output_stacked[2][0]
-                stack_image.lin_pol = np.sqrt(output_stacked[1][0]**2+output_stacked[2][0]**2)
-                stack_image.evpa=0.5*np.arctan2(output_stacked[2][0],output_stacked[1][0])
+        if align:
+            im_cube=im_cube.center()
 
-        elif self.ids.stack_pol_check.active:
-            output_stacked=stack_pol_fits(files_to_stack,weighted=weighted,align=align,stokes_u_fits=files_to_stack_u,stokes_q_fits=files_to_stack_q)
-            #create new image data with header info from first fits file
-            stack_image = ImageData(files_to_stack[0],pol_from_stokes=False,noise_method=self.noise_method,is_ehtim_model=self.ids.is_ehtim_model.active)
-            stack_image.Z = output_stacked[0][0]
-            if len(output_stacked) > 1:  # check for polarization
-                stack_image.lin_pol = output_stacked[1][0]
-                stack_image.evpa = output_stacked[2][0]
+        stack_image=im_cube.stack(mode="all").images.flatten()[0]
+
         #create plot
         self.final_stack_image=stack_image
         self.ids.stacked_image_i.state="down"
@@ -1997,7 +1930,8 @@ class ModelFits(TabbedPanel):
             if box.active:
                 files_to_stack.append(self.clean_filepaths[ind])
         if len(files_to_stack)>0:
-            maj,min,pos=get_common_beam(files_to_stack)
+            im_cube=ImageCube().import_files(files_to_stack)
+            maj,min,pos=im_cube.get_common_beam()
             self.ids.beam_maj.text="{:.4f}".format(maj)
             self.ids.beam_min.text = "{:.4f}".format(min)
             self.ids.beam_pos.text = "{:.4f}".format(pos)
