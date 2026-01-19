@@ -15,7 +15,7 @@ from kivy.properties import ObjectProperty, ListProperty, BooleanProperty, Bound
 from kivy.uix.widget import Widget
 from kivy.vector import Vector
 from matplotlib.backends.backend_agg import FigureCanvasAgg
-from matplotlib import cbook
+from matplotlib.cbook import _Stack as Stack
 from matplotlib.colors import to_hex
 from matplotlib.backend_bases import ResizeEvent
 from weakref import WeakKeyDictionary
@@ -155,7 +155,7 @@ class MatplotFigure(Widget):
         self.show_compare_cursor = False
         
         #manage back and next event
-        self._nav_stack = cbook.Stack()
+        self._nav_stack = Stack()
         self.set_history_buttons()         
         
         self.bind(size=self._onSize)
