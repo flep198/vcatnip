@@ -106,14 +106,20 @@ class ModelFits(TabbedPanel):
     stacking_single_plot_checkboxes = []
     final_stack_image = ""
 
-    #### PLOTTING variables
+    ### PLOTTING variables
     plotting_single_plots = []
     plotting_single_plots_data = []
     plotting_single_plot_buttons = []
     plotting_single_plot_checkboxes = []
     noise_method=""
+ 
+    #startup
+    def on_kv_post(self,base_widget):
+        from vcat.config import difmap_path
+        self.ids.difmap_path.text = difmap_path
 
     #### GENERAL FUNCTIONS ACROSS TABS
+
 
     def set_mojave_password(self,password):
         #TODO implement a check if the password is correct, if not, open MOJAVEPasswordPopup again.
@@ -2134,7 +2140,9 @@ class VCAT(App):
     def build(self):
         self.screen=ModelFits()
         self.screen.noise_method=self.screen.ids.noise_method.text
+
         return self.screen
+
 
     #### START OF KINEMATIC FUNCTIONS
 
@@ -2207,3 +2215,4 @@ class VCAT(App):
 
 if __name__ == "__main__":
     VCAT().run()
+

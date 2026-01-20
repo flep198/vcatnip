@@ -1,0 +1,14 @@
+! Started logfile: difmap.log_1 on Tue Jan 20 11:44:55 2026
+![@/opt/uvf_difmap_2.5q/difmap.boot]
+! Obeying initialization file: /opt/uvf_difmap_2.5q/difmap.boot
+device /xw
+! Attempting to open device: '/xw'
+pgscr 2,1,0,1
+float x_cmp
+float y_cmp
+float fl_cmp
+![Exited script file: /opt/uvf_difmap_2.5q/difmap.boot]
+! <Aborted by Interrupt>
+exit
+! Exiting program
+! Log file difmap.log_1 closed on Tue Jan 20 11:44:59 2026

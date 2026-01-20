@@ -1,0 +1,13 @@
+! Started logfile: difmap.log on Tue Jan 20 11:36:25 2026
+![@/opt/uvf_difmap_2.5q/difmap.boot]
+! Obeying initialization file: /opt/uvf_difmap_2.5q/difmap.boot
+device /xw
+! Attempting to open device: '/xw'
+pgscr 2,1,0,1
+float x_cmp
+float y_cmp
+float fl_cmp
+![Exited script file: /opt/uvf_difmap_2.5q/difmap.boot]
+exit
+! Exiting program
+! Log file difmap.log closed on Tue Jan 20 11:36:28 2026
