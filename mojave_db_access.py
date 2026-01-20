@@ -64,14 +64,14 @@ def upload_csv_to_MOJAVE(csv_file,observer,password,source):
                         "' AND method='UV' AND stokes='I' AND epoch='" + row['date'] +"'")
             cursor.execute(delete_query)
 
-        """
+        
         #check if a modelfit already exists:
         select_query = ("SELECT COUNT(*) FROM " + database + " WHERE source='" + source + "' AND observer='" + observer +
                         "' AND method='UV' AND stokes='I' AND epoch='" + row['date'] +"' AND id='" + str(row["component_number"]) + "'" )
 
         cursor.execute(select_query)
         result = cursor.fetchone()
-        """
+        
         if result[0] == 0:
             # No matching row found, so insert new record
             insert_query = ("INSERT INTO " + database +
