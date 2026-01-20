@@ -72,7 +72,7 @@ def upload_csv_to_MOJAVE(csv_file,observer,password,source):
         cursor.execute(select_query)
         result = cursor.fetchone()
         """
-        if True:#result[0] == 0:
+        if result[0] == 0:
             # No matching row found, so insert new record
             insert_query = ("INSERT INTO " + database +
             " (source, epoch, id, flux, dist, pa, size, ratio, cpa, stokes,observer,method,freq, use_in_fit, counterjet, rating) VALUES " +
